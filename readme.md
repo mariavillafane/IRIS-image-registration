@@ -20,7 +20,7 @@ IRIS can be accessed from Docker as an "image" (self-contained software package)
 
 On Microsoft Windows (desktop operating system) we recommend [docker desktop](https://www.docker.com/products/docker-desktop/)
 
-2. Download the corresponding "docker-image" (which is a self-contained software package with a set of instructions, specifiying all the libraries and dependencies that the GUI requires to run smoothly). Please refer to the latest version of IRIS. 
+2. Download the corresponding "docker-image" (which is a self-contained software package with a set of instructions, specifiying all the libraries and dependencies that IRIS requires to run smoothly). Please refer to the latest version of IRIS. 
 
 3. Run the docker-image via docker on the commandline (also referred to as "cprompt" or "cmd")
 
