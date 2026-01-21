@@ -42,7 +42,11 @@
     "eject": "react-scripts eject",
     "fix": "prettier --write .",
     "prepare": "husky install",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d build",
+    "docker-build": "docker build . -t mariavillafane/IRIS:latest",
+    "docker-run": "docker run -p 4000:4000 mariavillafane/IRIS:latest",
+    "docker-push": "docker push mariavillafane/IRIS:latest",
+    "docker-pull": "docker pull mariavillafane/IRIS:latest"
   },
   "eslintConfig": {
     "extends": [
