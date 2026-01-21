@@ -31,11 +31,11 @@ This makes sure that IRIS will be readily accessible at the browser (e.g. Chrome
 4. Alternatively, the user can access IRIS by running the docker-image via docker on the commandline (also referred to as "cprompt" or "cmd")
 
 ```
-docker run -p4000:4000 -it mariavillafane/regui:latest
+docker run -p4000:4000 -it mariavillafane/iris:latest
 ```
 
 5. Please refer to the latest version of IRIS: Update to the latest version by instructing "pull"
 
 ```
-docker pull mariavillafane/regui:latest
+docker pull mariavillafane/iris:latest
 ```
