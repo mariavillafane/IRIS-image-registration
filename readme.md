@@ -1,6 +1,6 @@
 # About IRIS
 
-IRIS (Integrated Registration & Imaging System) is a graphical user interface (GUI) for facilitating the alignment of images (also referred to as "image regitration"), and it follows the area-based image registration method presented in Maria Eugenia Villafane's PhD Thesis (Imperial College London, 2024, in collaboration with The National Gallery London), which can be accessed here: 
+IRIS (Integrated Registration & Imaging System) is a graphical user interface (GUI) for facilitating the alignment of images (also referred to as "image regitration"), and it follows the area-based image registration method presented in Maria Eugenia Villafane's PhD Thesis (Imperial College London, 2024, in collaboration with The National Gallery London), which can be accessed here:
 
 https://spiral.imperial.ac.uk/entities/publication/9fee2878-d68f-461b-9b44-5cc7ee04d7f0
 
@@ -12,7 +12,7 @@ This research was funded by the Arts and Humanities Research Council, and forms 
 
 https://art-ict.github.io/artict/home.html
 
-IRIS can be accessed from Docker as an "image" (self-contained software package), with no need of downloading any additional supporting libraries or applications. 
+IRIS can be accessed from Docker as an "image" (self-contained software package), with no need of downloading any additional supporting libraries or applications.
 
 # Installation Guide
 
@@ -20,17 +20,22 @@ IRIS can be accessed from Docker as an "image" (self-contained software package)
 
 On Microsoft Windows (desktop operating system) we recommend [docker desktop](https://www.docker.com/products/docker-desktop/)
 
-2. Download the corresponding "docker-image" (which is a self-contained software package with a set of instructions, specifiying all the libraries and dependencies that IRIS requires to run smoothly). Please refer to the latest version of IRIS. 
+2. If using MS Windows, user can open [docker desktop] and download ("pull") and run the corresponding "docker-image" (which is a self-contained software package with a set of instructions, specifiying all the libraries and dependencies that IRIS requires to run smoothly).
 
-3. Run the docker-image via docker on the commandline (also referred to as "cprompt" or "cmd")
+3. If running the docker-image on [docker desktop], it is recommended to download this [compose.yml](https://github.com/mariavillafane/registration-ui/blob/main/compose.yml) file and execute it via the commandline, by opening the commandline in the folder where this files is downloaded, and instructing (in the commandline):
+
+`docker compose up`
+
+This makes sure that IRIS will be readily accessible at the browser (e.g. Chrome) at http://localhost:4000/
+
+4. Alternatively, the user can access IRIS by running the docker-image via docker on the commandline (also referred to as "cprompt" or "cmd")
 
 ```
 docker run -p4000:4000 -it mariavillafane/regui:latest
 ```
 
-4. If running the docker-image on Docker Desktop, it is recommended to download this [compose.yml](https://github.com/mariavillafane/registration-ui/blob/main/compose.yml) file and execute it via the commandline, by instructing:
+5. Please refer to the latest version of IRIS: Update to the latest version by instructing "pull"
 
-`docker compose up`
-
-This makes sure that IRIS will be readily accessible at the browser (e.g. Chrome) at http://localhost:4000/
- 
+```
+docker pull mariavillafane/regui:latest
+```

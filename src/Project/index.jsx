@@ -329,14 +329,24 @@ export default function ProjectView() {
     <>
       <AppBar position="static" sx={{ marginBottom: 2 }}>
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Box> Image Registration </Box>
+          <Box sx={{ display: "flex", alignItems: "baseline", gap: 1 }}>
+            <Box
+              component="span"
+              sx={{ fontSize: "1.8rem", fontWeight: 700, gap: 10 }}
+            >
+              IRIS
+            </Box>
+            <Box component="span" sx={{ fontSize: "0.95rem", opacity: 0.9 }}>
+              Integrated Registration & Imaging System
+            </Box>
+          </Box>
 
           <Box>
             <a
               href="https://github.com/mariavillafane/registration-ui"
               target="_blank"
             >
-              About Image Registration v.202512{" "}
+              About IRIS v.202601{" "}
             </a>
           </Box>
         </Toolbar>

@@ -129,6 +129,13 @@ function App() {
     >
       <AppBar position="static">
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Box
+            component="span"
+            sx={{ fontSize: "1.8rem", fontWeight: 700, marginRight: 1 }}
+          >
+            IRIS
+          </Box>
+
           <Box display="flex" alignItems={"center"}>
             <Link to="/">
               <Tooltip title="All Projects">
