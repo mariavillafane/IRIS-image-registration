@@ -12,6 +12,8 @@ import {
   Divider,
   IconButton,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Tooltip,
   Typography,
@@ -80,6 +82,8 @@ function App() {
   const [zoomPower, setZoomPower] = usePersistentState("zoomPower", 0.01);
   const [collapse, setCollapse] = useState(false);
 
+  const [editorMode, setEditorMode] = useState("edit");
+
   useEffect(() => {
     if (settingsJson.loading) return;
     const h = setTimeout(() => {
@@ -142,6 +146,18 @@ function App() {
                 <AppsIcon />
               </Tooltip>
             </Link>
+
+            <ToggleButtonGroup
+              //color="primary"
+              value={editorMode} //toggle
+              exclusive
+              onChange={(event, newEditorMode) => setEditorMode(newEditorMode)}
+              aria-label="Mode Selection"
+            >
+              <ToggleButton value="compare">compare</ToggleButton>
+              <ToggleButton value="edit">edit</ToggleButton>
+            </ToggleButtonGroup>
+
             <Box marginLeft={"1em"} display="flex">
               <TextField
                 {...getInputProps("x-coord", "x")}
@@ -268,6 +284,7 @@ function App() {
             stacks={stacks}
             worldScale={worldScale}
             zoomPower={zoomPower}
+            editorMode={editorMode}
           />
         </Panel>
         <PanelResizeHandle

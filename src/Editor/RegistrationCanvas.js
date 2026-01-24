@@ -29,6 +29,7 @@ const CanvasImage = (props) => {
       width={props.width * props.scaling}
       height={props.height * props.scaling}
       transform={`rotate(${props.rotation},${props.x},${props.y})`}
+      clipPath={props.clipPath}
     />
   );
 };
@@ -42,6 +43,9 @@ export function RegistrationCanvas(props) {
 
   const w = (props.stacks?.[0]?.x || 0) + (props.stacks?.[0]?.width || 0);
   const h = (props.stacks?.[0]?.y || 0) + (props.stacks?.[0]?.height || 0);
+  const { editorMode } = props; //here just calling the "editorMode" prop passed from parent
+  const [mousepos, setMousepos] = useState({ x: 0, y: 0 });
+  console.log(mousepos);
 
   return (
     <Box
@@ -76,18 +80,22 @@ export function RegistrationCanvas(props) {
           props.setSelectedImageId(id);
         }}
         onMouseMove={(e) => {
+          console.log("ytytyu", e);
+          const { clientX, clientY } = e.originalEvent;
+
+          setMousepos({
+            x: Math.round(e.x),
+            y: Math.round(e.y),
+          });
           if (!dragStart) return;
           console.log(e);
-
           const id = dragStart[4];
-          const { clientX, clientY } = e.originalEvent;
+
           const [x, y] = [
             Math.round(clientX / e.value.a - dragStart[0] + dragStart[2]),
             Math.round(clientY / e.value.d - dragStart[1] + dragStart[3]),
           ];
-
           const stacks = props.stacks.with(id, { ...props.stacks[id], x, y });
-
           props.setStacks(stacks);
         }}
         onMouseUp={(e) => {
@@ -135,6 +143,9 @@ export function RegistrationCanvas(props) {
                 stroke-width="1"
               />
             </pattern>
+            <clipPath id="clipPath">
+              <rect x={mousepos.x} y={mousepos.y} width={w} height={h} />
+            </clipPath>
           </defs>
 
           <rect
@@ -147,7 +158,7 @@ export function RegistrationCanvas(props) {
 
           {props.stacks
             .map((x, i) => ({ ...x, i }))
-            .flatMap((stack) =>
+            .flatMap((stack, i) =>
               stack.imageEntries
                 .filter((x) => x.checked)
                 .map((entry) => (
@@ -157,6 +168,9 @@ export function RegistrationCanvas(props) {
                     entryId={entry.id}
                     {...stack}
                     {...entry}
+                    {...(editorMode === "compare" && i > 0
+                      ? { clipPath: "url(#clipPath)" }
+                      : {})}
                   />
                 ))
             )}
