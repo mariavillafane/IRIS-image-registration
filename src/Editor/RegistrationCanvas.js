@@ -34,6 +34,41 @@ const CanvasImage = (props) => {
   );
 };
 
+const ComparisonClipPathRectangle = ({ orientation, mousepos, w, h }) => {
+  switch (orientation % 8) {
+    case 0:
+      return <rect x={mousepos.x} y={0} width={w} height={h} />;
+    case 1:
+      return (
+        <rect x={0} y={mousepos.y} width={w} height={h} /> //3
+      );
+    case 2:
+      return (
+        <rect x={0} y={0} width={mousepos.x} height={h} /> //2
+      );
+    case 3:
+      return (
+        <rect x={0} y={0} width={w} height={mousepos.y} /> //1
+      );
+    case 4:
+      return (
+        <rect x={mousepos.x} y={0} width={w} height={mousepos.y} /> //1
+      );
+    case 5:
+      return (
+        <rect x={mousepos.x} y={mousepos.y} width={w} height={h} /> //2ok
+      );
+    case 6:
+      return (
+        <rect x={0} y={mousepos.y} width={mousepos.x} height={h} /> //3
+      );
+    case 7:
+      return (
+        <rect x={0} y={0} width={mousepos.x} height={mousepos.y} /> //4
+      );
+  }
+};
+
 export function RegistrationCanvas(props) {
   const ref = useRef();
   const Viewer = useRef(null);
@@ -45,6 +80,8 @@ export function RegistrationCanvas(props) {
   const h = (props.stacks?.[0]?.y || 0) + (props.stacks?.[0]?.height || 0);
   const { editorMode } = props; //here just calling the "editorMode" prop passed from parent
   const [mousepos, setMousepos] = useState({ x: 0, y: 0 });
+  const [orientation, setOrientation] = useState(0);
+
   console.log(mousepos);
 
   return (
@@ -71,6 +108,11 @@ export function RegistrationCanvas(props) {
         onChangeTool={onChangeTool}
         toolbarProps={{ position: "left" }}
         onMouseDown={(e) => {
+          if (editorMode == "compare") {
+            setOrientation(orientation + 1);
+            return;
+          }
+
           if (e.originalEvent?.target?.dataset?.id === undefined) return;
 
           const id = +e.originalEvent.target.dataset.id;
@@ -144,7 +186,12 @@ export function RegistrationCanvas(props) {
               />
             </pattern>
             <clipPath id="clipPath">
-              <rect x={mousepos.x} y={mousepos.y} width={w} height={h} />
+              <ComparisonClipPathRectangle
+                orientation={orientation}
+                mousepos={mousepos}
+                w={w}
+                h={h}
+              />
             </clipPath>
           </defs>
 
