@@ -19,7 +19,8 @@ const CanvasImage = (props) => {
           }, 100);
         }
       }}
-      data-id={props.i}
+      //data-id={props.i}
+      data-stack-index={props.i}
       data-stack-id={props.stackId}
       data-entry-id={props.entryId}
       x={props.x}
@@ -112,19 +113,26 @@ export function RegistrationCanvas(props) {
             setOrientation(orientation + 1);
             return;
           }
-
-          if (e.originalEvent?.target?.dataset?.id === undefined) return;
-
-          const id = +e.originalEvent.target.dataset.id;
+          if (e.originalEvent?.target?.dataset?.stackId === undefined) return;
+          //const index = +e.originalEvent.target.dataset.id; //here  index == stackIndex
+          const stackIndex = +e.originalEvent.target.dataset.stackIndex; //here  index == stackIndex
+          const stackId = +e.originalEvent.target.dataset.stackId;
           const { clientX, clientY } = e.originalEvent;
-          const { x, y } = props.stacks[id];
-          setDragStart([clientX / e.value.a, clientY / e.value.d, x, y, id]);
-          props.setSelectedImageId(id);
+          const { x, y } = props.stacks[stackIndex];
+          setDragStart([
+            clientX / e.value.a,
+            clientY / e.value.d,
+            x,
+            y,
+            stackIndex,
+          ]);
+          props.setSelectedStackId(stackId);
+          console.log("image_id", stackIndex);
+          console.log("selected_stack_id", props.selectedStackId); //selectedStackId
         }}
         onMouseMove={(e) => {
-          console.log("ytytyu", e);
+          //console.log("ytytyu", e);
           const { clientX, clientY } = e.originalEvent;
-
           setMousepos({
             x: Math.round(e.x),
             y: Math.round(e.y),
@@ -132,7 +140,6 @@ export function RegistrationCanvas(props) {
           if (!dragStart) return;
           console.log(e);
           const id = dragStart[4];
-
           const [x, y] = [
             Math.round(clientX / e.value.a - dragStart[0] + dragStart[2]),
             Math.round(clientY / e.value.d - dragStart[1] + dragStart[3]),
@@ -143,15 +150,12 @@ export function RegistrationCanvas(props) {
         onMouseUp={(e) => {
           if (!dragStart) return;
           const id = dragStart[4];
-
           const { clientX, clientY } = e.originalEvent;
           const [x, y] = [
             Math.round(clientX / e.value.a - dragStart[0] + dragStart[2]),
             Math.round(clientY / e.value.d - dragStart[1] + dragStart[3]),
           ];
-
           const stacks = props.stacks.with(id, { ...props.stacks[id], x, y });
-
           props.setStacks(stacks);
           setDragStart(null);
         }}
@@ -215,7 +219,11 @@ export function RegistrationCanvas(props) {
                     entryId={entry.id}
                     {...stack}
                     {...entry}
-                    {...(editorMode === "compare" && i > 0
+                    //{...(editorMode === "compare" && i > 0   //applies curtainviewer to all but first image 260125
+                    {...(editorMode === "compare" &&
+                    ((props.selectedStackId &&
+                      stack.id == props.selectedStackId) ||
+                      (!props.selectedStackId && i > 0))
                       ? { clipPath: "url(#clipPath)" }
                       : {})}
                   />

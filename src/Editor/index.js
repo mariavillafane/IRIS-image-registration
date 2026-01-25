@@ -75,7 +75,7 @@ function App() {
   const stacks = settingsJson.workingImages;
   const worldScale = settingsJson.worldScale;
 
-  const [selectedImageId, setSelectedImageId] = useState(0);
+  const [selectedStackId, setSelectedStackId] = useState(0);
   const [inProgress, setInProgress] = useState(false);
   const [isLoadingFile, setIsLoadingFile] = useState(0);
 
@@ -94,10 +94,10 @@ function App() {
     return () => clearTimeout(h);
   }, [settingsJson]);
 
-  const imageMoving = stacks.find((stack) => selectedImageId == stack.id);
+  const imageMoving = stacks.find((stack) => selectedStackId == stack.id);
   const setImageMoving = (newImageMoving) => {
     setStacks((allImages) => {
-      const x = allImages.findIndex((stack) => selectedImageId == stack.id);
+      const x = allImages.findIndex((stack) => selectedStackId == stack.id);
       return allImages.with(x, newImageMoving);
     });
   };
@@ -278,8 +278,8 @@ function App() {
       >
         <Panel style={{ overflow: "hidden", display: "flex" }}>
           <RegistrationCanvas
-            selectedImageId={selectedImageId}
-            setSelectedImageId={setSelectedImageId}
+            selectedStackId={selectedStackId}
+            setSelectedStackId={setSelectedStackId}
             setStacks={setStacks}
             stacks={stacks}
             worldScale={worldScale}
@@ -333,8 +333,8 @@ function App() {
             projectId={settingsJson.id}
             stacks={stacks}
             setStacks={setStacks}
-            selectedImageId={selectedImageId}
-            setSelectedImageId={setSelectedImageId}
+            selectedStackId={selectedStackId}
+            setSelectedStackId={setSelectedStackId}
             small={collapse}
           />
         </Panel>

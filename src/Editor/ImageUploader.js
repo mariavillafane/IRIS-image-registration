@@ -46,13 +46,11 @@ export function ImageUploader({
   projectId,
   stacks,
   setStacks,
-  selectedImageId,
-  setSelectedImageId,
+  selectedStackId,
+  setSelectedStackId,
   small = false,
 }) {
   const [uploads, setUploads] = useState([0, 0]);
-  console.log("rerender", stacks.length, selectedImageId);
-
   async function onDrop2(acceptedFiles) {
     const stackId = computeNextId(stacks);
     const imageEntries = await Promise.all(
@@ -64,7 +62,7 @@ export function ImageUploader({
 
         return {
           stackId,
-          id: makefilename(file, stackId), //`${stackId}-${counter++}-${file.name}`,
+          id: makefilename(file, stackId),
           ...data.metadata,
           file: {
             name: file.name,
@@ -219,9 +217,9 @@ export function ImageUploader({
                 gap: "0.5rem",
                 backgroundColor: "lightgray",
                 border:
-                  selectedImageId == stack.id && stack.id !== 0
+                  selectedStackId == stack.id && stack.id !== 0
                     ? "solid 3px coral"
-                    : selectedImageId == stack.id && stack.id == 0
+                    : selectedStackId == stack.id && stack.id == 0
                     ? "solid 3px #321ab0"
                     : "solid 3px transparent",
               }}
@@ -253,7 +251,7 @@ export function ImageUploader({
                           <img
                             width={!small ? "100px" : "50px"}
                             src={imageEntry.thumbnailUrl}
-                            onClick={() => setSelectedImageId(stack.id)}
+                            onClick={() => setSelectedStackId(stack.id)}
                           />
                           <Typography
                             fontSize={"0.5rem"}
