@@ -42,6 +42,202 @@ function makefilename(file, stackId) {
   return filename_ok_joined_ok;
 }
 
+function StackUploader({
+  stack,
+  index,
+  selectedStackId,
+  setSelectedStackId,
+  setStacks,
+  stacks,
+  small,
+  onDropImageToStack,
+}) {
+  return (
+    <Paper
+      // key={index}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        padding: ".6em",
+        gap: "0.5rem",
+        backgroundColor: "lightgray",
+        border:
+          selectedStackId == stack.id && stack.id !== 0
+            ? "solid 3px coral"
+            : selectedStackId == stack.id && stack.id == 0
+            ? "solid 3px #321ab0"
+            : "solid 3px transparent",
+      }}
+    >
+      <Box display="flex" flexDirection={"row"} gap="0.5rem">
+        {stack.imageEntries
+          .slice(0, small ? 1 : Infinity)
+          .map((imageEntry, entryIndex) => (
+            <Card key={imageEntry.id}>
+              <Box
+                display="flex"
+                flexDirection="row"
+                position="relative"
+                overflow="hidden"
+                sx={{
+                  "& > .controls": {
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    right: "-1em",
+                    width: 0,
+                    background: "rgba(200,200,200,0.6)",
+                    transition: "all 0.2s",
+                  },
+                  "&:hover > .controls": { right: 0, width: "2em" },
+                }}
+              >
+                <Box display="flex" flexDirection={"column"}>
+                  <img
+                    width={!small ? "100px" : "50px"}
+                    src={imageEntry.thumbnailUrl}
+                    onClick={() => setSelectedStackId(stack.id)}
+                  />
+                  <Typography
+                    fontSize={"0.5rem"}
+                    display={small ? "none" : "block"}
+                  >
+                    {imageEntry.id}
+                  </Typography>
+                </Box>
+
+                <Box
+                  className="controls"
+                  display="flex"
+                  flexDirection="column"
+                  alignItems={"center"}
+                >
+                  <ClearIcon
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `are you sure you want to delete ${imageEntry.id}`
+                        )
+                      )
+                        return;
+
+                      const newEntries = stack.imageEntries.filter(
+                        //newEntries are all the entries remaining (the ones not-deleted)
+                        (x) => x.id != imageEntry.id
+                      );
+
+                      const basePath = imageEntry.files.url
+                        .split("/")
+                        .slice(0, -1)
+                        .join("/");
+                      fetch(basePath, { method: "delete" }).catch(
+                        console.error
+                      );
+
+                      //window.URL.revokeObjectURL(imageEntry.imageUrl); //delete image
+
+                      if (newEntries.length == 0) {
+                        setStacks([
+                          ...stacks.slice(0, index),
+                          ...stacks.slice(index + 1, stack.length),
+                        ]);
+                      } else {
+                        setStacks(
+                          stacks.with(index, {
+                            ...stack,
+                            imageEntries: newEntries,
+                          })
+                        );
+                      }
+                    }}
+                  />
+
+                  <Checkbox
+                    checked={imageEntry.checked}
+                    icon={<VisibilityOffSharpIcon />}
+                    checkedIcon={<VisibilitySharpIcon color="primary" />}
+                    onChange={(event) => {
+                      const newEntries = stack.imageEntries.with(entryIndex, {
+                        ...imageEntry,
+                        checked: event.target.checked,
+                      });
+                      setStacks(
+                        stacks.with(index, {
+                          ...stack,
+                          imageEntries: newEntries,
+                        })
+                      );
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Card>
+          ))}
+
+        <Dropzone
+          onDrop={(acceptedFiles) =>
+            onDropImageToStack(stack, index, acceptedFiles, index)
+          }
+        >
+          {({ getRootProps, getInputProps }) => (
+            <Button
+              {...getRootProps()}
+              color="primary"
+              sx={{
+                maxWidth: 25,
+                fontSize: "0.7rem",
+                display: small ? "none" : "block",
+              }}
+              variant="outlined"
+            >
+              {index != 0 ? "Add image to stack" : "Replace fixed image"}
+              <input
+                {...getInputProps()}
+                accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*"
+              />
+            </Button>
+          )}
+        </Dropzone>
+      </Box>
+      <Box
+        display={small ? "none" : "flex"}
+        overflow="hidden"
+        height={!small ? "3em" : "0"}
+        width={!small ? "500px" : "0"}
+        gap="0.2rem"
+        fontSize="0.5em"
+      >
+        <Tooltip title="location x,y">
+          <Chip
+            icon={<LocationOnIcon />}
+            size="small"
+            variant="outlined"
+            label={`${Math.round(stack.x)},${Math.round(stack.y)}`}
+          />
+        </Tooltip>
+        <Tooltip title="rotation">
+          <Chip
+            icon={<ReplayIcon />}
+            size="small"
+            variant="outlined"
+            label={`${stack.rotation}`}
+          />
+        </Tooltip>
+        <Tooltip title="image Size (wxh) @ (scale)">
+          <Chip
+            icon={<PhotoSizeSelectLargeIcon />}
+            size="small"
+            variant="outlined"
+            label={`${Math.round(stack.width * stack.scaling)}x${Math.round(
+              stack.height * stack.scaling
+            )} @ ${stack.scaling}`}
+          />
+        </Tooltip>
+      </Box>
+    </Paper>
+  );
+}
+
 export function ImageUploader({
   projectId,
   stacks,
@@ -56,7 +252,9 @@ export function ImageUploader({
     const imageEntries = await Promise.all(
       acceptedFiles.map(async (file, i, all) => {
         setUploads([i, all.length]);
+        console.log("uploading", file.name);
         const data = await uploadImage(projectId, file);
+        console.log("done uploading", file.name);
         setUploads([i + 1, all.length]);
         console.log(data);
 
@@ -96,6 +294,7 @@ export function ImageUploader({
       width,
       height,
     };
+    console.log("adding", stack);
     setStacks((stacks) => [...stacks, stack]);
   }
 
@@ -173,6 +372,7 @@ export function ImageUploader({
           Uploading {uploads[0]} / {uploads[1]} <LinearProgress />{" "}
         </Alert>
       </Snackbar>
+
       <CardContent
         sx={{
           display: "flex",
@@ -191,7 +391,8 @@ export function ImageUploader({
                 backgroundColor="#eeeeee"
                 gutterBottom
               >
-                Upload Images
+                Upload Fixed Image (only one image, used for comparison or as
+                background)
               </Typography>
             </div>
           )}
@@ -207,198 +408,62 @@ export function ImageUploader({
             gap: "0.5rem",
           }}
         >
-          {stacks.map((stack, index) => (
-            <Paper
+          {stacks.slice(0, 1).map((stack, index) => (
+            <StackUploader
               key={index}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                padding: ".6em",
-                gap: "0.5rem",
-                backgroundColor: "lightgray",
-                border:
-                  selectedStackId == stack.id && stack.id !== 0
-                    ? "solid 3px coral"
-                    : selectedStackId == stack.id && stack.id == 0
-                    ? "solid 3px #321ab0"
-                    : "solid 3px transparent",
-              }}
-            >
-              <Box display="flex" flexDirection={"row"} gap="0.5rem">
-                {stack.imageEntries
-                  .slice(0, small ? 1 : Infinity)
-                  .map((imageEntry, entryIndex) => (
-                    <Card key={imageEntry.id}>
-                      <Box
-                        display="flex"
-                        flexDirection="row"
-                        position="relative"
-                        overflow="hidden"
-                        sx={{
-                          "& > .controls": {
-                            position: "absolute",
-                            top: 0,
-                            bottom: 0,
-                            right: "-1em",
-                            width: 0,
-                            background: "rgba(200,200,200,0.6)",
-                            transition: "all 0.2s",
-                          },
-                          "&:hover > .controls": { right: 0, width: "2em" },
-                        }}
-                      >
-                        <Box display="flex" flexDirection={"column"}>
-                          <img
-                            width={!small ? "100px" : "50px"}
-                            src={imageEntry.thumbnailUrl}
-                            onClick={() => setSelectedStackId(stack.id)}
-                          />
-                          <Typography
-                            fontSize={"0.5rem"}
-                            display={small ? "none" : "block"}
-                          >
-                            {imageEntry.id}
-                          </Typography>
-                        </Box>
+              stack={stack}
+              index={index}
+              setSelectedStackId={setSelectedStackId}
+              selectedStackId={selectedStackId}
+              setStacks={setStacks}
+              stacks={stacks}
+              small={small}
+              onDropImageToStack={onDropImageToStack}
+            />
+          ))}
+        </Box>
 
-                        <Box
-                          className="controls"
-                          display="flex"
-                          flexDirection="column"
-                          alignItems={"center"}
-                        >
-                          <ClearIcon
-                            onClick={() => {
-                              if (
-                                !window.confirm(
-                                  `are you sure you want to delete ${imageEntry.id}`
-                                )
-                              )
-                                return;
+        <Dropzone onDrop={onDrop2}>
+          {({ getRootProps, getInputProps }) => (
+            <div {...getRootProps()}>
+              <input {...getInputProps()} />
 
-                              const newEntries = stack.imageEntries.filter(
-                                //newEntries are all the entries remaining (the ones not-deleted)
-                                (x) => x.id != imageEntry.id
-                              );
-
-                              const basePath = imageEntry.files.url
-                                .split("/")
-                                .slice(0, -1)
-                                .join("/");
-                              fetch(basePath, { method: "delete" }).catch(
-                                console.error
-                              );
-
-                              //window.URL.revokeObjectURL(imageEntry.imageUrl); //delete image
-
-                              if (newEntries.length == 0) {
-                                setStacks([
-                                  ...stacks.slice(0, index),
-                                  ...stacks.slice(index + 1, stack.length),
-                                ]);
-                              } else {
-                                setStacks(
-                                  stacks.with(index, {
-                                    ...stack,
-                                    imageEntries: newEntries,
-                                  })
-                                );
-                              }
-                            }}
-                          />
-
-                          <Checkbox
-                            checked={imageEntry.checked}
-                            icon={<VisibilityOffSharpIcon />}
-                            checkedIcon={
-                              <VisibilitySharpIcon color="primary" />
-                            }
-                            onChange={(event) => {
-                              const newEntries = stack.imageEntries.with(
-                                entryIndex,
-                                {
-                                  ...imageEntry,
-                                  checked: event.target.checked,
-                                }
-                              );
-                              setStacks(
-                                stacks.with(index, {
-                                  ...stack,
-                                  imageEntries: newEntries,
-                                })
-                              );
-                            }}
-                          />
-                        </Box>
-                      </Box>
-                    </Card>
-                  ))}
-
-                <Dropzone
-                  onDrop={(acceptedFiles) =>
-                    onDropImageToStack(stack, index, acceptedFiles, index)
-                  }
-                >
-                  {({ getRootProps, getInputProps }) => (
-                    <Button
-                      {...getRootProps()}
-                      color="primary"
-                      sx={{
-                        maxWidth: 25,
-                        fontSize: "0.7rem",
-                        display: small ? "none" : "block",
-                      }}
-                      variant="outlined"
-                    >
-                      {index != 0
-                        ? "Add image to stack"
-                        : "Replace fixed image"}
-                      <input
-                        {...getInputProps()}
-                        accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*"
-                      />
-                    </Button>
-                  )}
-                </Dropzone>
-              </Box>
-              <Box
-                display={small ? "none" : "flex"}
-                overflow="hidden"
-                height={!small ? "3em" : "0"}
-                width={!small ? "500px" : "0"}
-                gap="0.2rem"
-                fontSize="0.5em"
+              <Typography
+                sx={{ fontSize: 14 }}
+                color="text.secondary"
+                backgroundColor="#eeeeee"
+                gutterBottom
               >
-                <Tooltip title="location x,y">
-                  <Chip
-                    icon={<LocationOnIcon />}
-                    size="small"
-                    variant="outlined"
-                    label={`${Math.round(stack.x)},${Math.round(stack.y)}`}
-                  />
-                </Tooltip>
-                <Tooltip title="rotation">
-                  <Chip
-                    icon={<ReplayIcon />}
-                    size="small"
-                    variant="outlined"
-                    label={`${stack.rotation}`}
-                  />
-                </Tooltip>
-                <Tooltip title="image Size (wxh) @ (scale)">
-                  <Chip
-                    icon={<PhotoSizeSelectLargeIcon />}
-                    size="small"
-                    variant="outlined"
-                    label={`${Math.round(
-                      stack.width * stack.scaling
-                    )}x${Math.round(stack.height * stack.scaling)} @ ${
-                      stack.scaling
-                    }`}
-                  />
-                </Tooltip>
-              </Box>
-            </Paper>
+                Upload Moving Images (you can upload multiple images, they will
+                be added to the same stack and you can toggle their visibility
+                in the stack)
+              </Typography>
+            </div>
+          )}
+        </Dropzone>
+
+        <Box
+          display="flex"
+          flexDirection="column"
+          sx={{
+            overflow: "scroll",
+            marginTop: "0.5em",
+            paddingInline: "0.5rem",
+            gap: "0.5rem",
+          }}
+        >
+          {stacks.slice(1).map((stack, index) => (
+            <StackUploader
+              key={index}
+              stack={stack}
+              index={index + 1}
+              setSelectedStackId={setSelectedStackId}
+              selectedStackId={selectedStackId}
+              setStacks={setStacks}
+              stacks={stacks}
+              small={small}
+              onDropImageToStack={onDropImageToStack}
+            />
           ))}
         </Box>
       </CardContent>

@@ -78,13 +78,6 @@ function ProjectCard({ refresh, ...p }) {
             label={p.workingImages.flatMap((x) => x.imageEntries).length}
           />
         </Tooltip>
-
-        {/* <Tooltip title="Jobs">
-          <Chip
-            avatar={<WorkIcon />}
-            label={jobsByProject[x.id].length}
-          />
-        </Tooltip> */}
       </Box>
 
       <Button>
