@@ -26,6 +26,7 @@ import GetAppIcon from "@mui/icons-material/GetApp";
 import { useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
 import { uploadImage } from "../utils/actions";
+import { apiUrl } from "../utils/api";
 import { useJobQueue } from "../utils/hooks";
 
 function TransformationData({ id, transformation }) {
@@ -57,7 +58,7 @@ function TransformationData({ id, transformation }) {
             const data = await uploadImage(id, file);
             console.log(data);
 
-            await fetch("/api/transform", {
+            await fetch(apiUrl("/api/transform"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -137,10 +138,13 @@ export function JobQueueViewer({ id }) {
   const fetchResults = async ({ id, status }) => {
     if (status != "success") return;
     console.log("feching", id, status);
-    const resultingTransformedImageFiles = await fetch(`/api/results/${id}`, {
-      method: "GET", // *GET, POST, PUT, DELETE, etc.
-      mode: "cors", // no-cors, *cors, same-origin
-    }).then((x) => x.json());
+    const resultingTransformedImageFiles = await fetch(
+      apiUrl(`/api/results/${id}`),
+      {
+        method: "GET", // *GET, POST, PUT, DELETE, etc.
+        mode: "cors", // no-cors, *cors, same-origin
+      }
+    ).then((x) => x.json());
     setResults(resultingTransformedImageFiles);
     setShowDrawer(3);
   };

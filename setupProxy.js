@@ -1,12 +1,9 @@
 const { createProxyMiddleware } = require("http-proxy-middleware");
-console.log("src/setupProxy.js loaded");
-const http = require("http");
+console.log("main setupProxy.js loaded");
+// const http = require('http');
 
 // Keep-alive agent so sockets are reused for large uploads
-const keepAliveAgent = new http.Agent({
-  keepAlive: true,
-  maxSockets: Infinity,
-});
+// const keepAliveAgent = new http.Agent({ keepAlive: true });
 
 module.exports = function (app) {
   app.use(
@@ -22,45 +19,31 @@ module.exports = function (app) {
       // Prevent the proxy from timing out on long uploads
       proxyTimeout: 0,
       timeout: 0,
-      agent: keepAliveAgent,
-
-      // Critical: Do NOT buffer the request body
-      // Let it stream directly to backend
-      ws: true,
+      // agent: keepAliveAgent,
 
       onProxyReq: (proxyReq, req, res) => {
-        // Log request details for debugging
-        console.log(`Proxying: ${req.method} ${req.originalUrl}`);
-        console.log(`Content-Type: ${req.headers["content-type"]}`);
-        console.log(`Content-Length: ${req.headers["content-length"]}`);
+        // Helpful logging for debugging
+        console.log(
+          `Proxying request: ${req.method} ${req.originalUrl} -> ${proxyReq.path}`
+        );
 
         // Ensure connection stays alive for long uploads
         proxyReq.setHeader("Connection", "keep-alive");
 
-        // Forward Content-Length header to prevent chunked encoding issues
+        // Forward Content-Length header when present so the proxy streams correctly
         const contentLength = req.headers["content-length"];
         if (contentLength) {
           proxyReq.setHeader("Content-Length", contentLength);
         }
       },
 
-      onProxyRes: (proxyRes, req, res) => {
-        // Log response status to debug issues
-        console.log(`Response status: ${proxyRes.statusCode}`);
-      },
-
       onError: (err, req, res) => {
         console.error("Proxy error:", err && err.message);
         if (!res.headersSent) {
-          res.writeHead(502, { "Content-Type": "application/json" });
+          res.writeHead(502, { "Content-Type": "text/plain" });
         }
         try {
-          res.end(
-            JSON.stringify({
-              error: "Proxy error",
-              details: err && err.message,
-            })
-          );
+          res.end("Proxy error");
         } catch (e) {}
       },
     })

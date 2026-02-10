@@ -1,5 +1,5 @@
 services:
   regui:
-    image: mariavillafane/regui:latest
+    image: mariavillafane/iris:latest
     ports:
       - "4000:4000"

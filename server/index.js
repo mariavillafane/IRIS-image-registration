@@ -12,8 +12,38 @@ const app = express(); //express() creates a http server
 mkdirp("tmp");
 loadTasks();
 
-app.set("limit", "2000mb");
-app.use(express.json({ limit: "2000mb" }));
+// Increase request body size limits for large file uploads
+app.set("limit", "5000mb");
+app.use(express.json({ limit: "5000mb" }));
+app.use(express.urlencoded({ limit: "5000mb", extended: true }));
+
+// Enable CORS only in development so the React dev server (localhost:3000)
+// can make requests directly to the backend on localhost:4000.
+if (process.env.NODE_ENV !== "production") {
+  const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  app.use(
+    cors({
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like curl, postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          return callback(null, true);
+        }
+        return callback(new Error("Not allowed by CORS"));
+      },
+      credentials: true,
+    })
+  );
+}
+
+// Return server info (full URL) for the frontend to consume
+// Constructs the full URL from the request headers
+app.get("/api/server-info", (req, res) => {
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:4000";
+  const serverUrl = `${protocol}://${host}`;
+  res.json({ serverUrl, port });
+});
 
 app.use(importApi);
 app.use(tasksApi);

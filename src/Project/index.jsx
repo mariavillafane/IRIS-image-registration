@@ -39,6 +39,7 @@ import { useNavigate } from "react-router";
 import Dropzone, { useDropzone } from "react-dropzone";
 import { useJobQueue } from "../utils/hooks";
 import { uploadImage } from "../utils/actions";
+import { apiUrl } from "../utils/api";
 
 function ProjectCard({ refresh, ...p }) {
   const navigate = useNavigate();
@@ -122,7 +123,7 @@ function ProjectCard({ refresh, ...p }) {
         />
 
         <SpeedDialAction
-          onClick={() => window.open(`/api/export/${p.id}`, "_blank")}
+          onClick={() => window.open(apiUrl(`/api/export/${p.id}`), "_blank")}
           icon={<FileDownloadIcon color="info" />}
           tooltipTitle={"Export"}
         />
@@ -131,7 +132,7 @@ function ProjectCard({ refresh, ...p }) {
           onClick={() => {
             if (!window.confirm(`are you sure you want to delete ${p.id}`))
               return;
-            fetch(`/api/delete/${p.id}`, { method: "POST" })
+            fetch(apiUrl(`/api/delete/${p.id}`), { method: "POST" })
               .then(console.log)
               .then(refresh);
           }}
@@ -184,7 +185,7 @@ function TransformationData({ id, transformation }) {
             const data = await uploadImage(id, file);
             console.log(data);
 
-            await fetch("/api/transform", {
+            await fetch(apiUrl("/api/transform"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -265,7 +266,7 @@ export function JobResults(job) {
   const [results, setResults] = useState([]);
 
   useEffect(() => {
-    fetch(`/api/results/${job.id}`, {
+    fetch(apiUrl(`/api/results/${job.id}`), {
       method: "GET", // *GET, POST, PUT, DELETE, etc.
       mode: "cors", // no-cors, *cors, same-origin
     })
@@ -298,7 +299,7 @@ export default function ProjectView() {
 
   const { jobs } = useJobQueue();
   useEffect(() => {
-    fetch("/api/projects")
+    fetch(apiUrl("/api/projects"))
       .then((x) => x.json())
       .then((x) => x.sort((a, b) => b.uploaded - a.uploaded))
       .then(setProjects);
@@ -308,7 +309,7 @@ export default function ProjectView() {
     const data = new FormData();
     data.append("project", files[0]);
 
-    fetch("/api/import", {
+    fetch(apiUrl("/api/import"), {
       method: "POST",
       body: data,
     }).then(refresh);
@@ -464,7 +465,7 @@ export default function ProjectView() {
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`/api/export/${x.id}`, "_blank");
+                          window.open(apiUrl(`/api/export/${x.id}`), "_blank");
                         }}
                       >
                         {" "}
@@ -476,7 +477,7 @@ export default function ProjectView() {
                           disabled={x.status != "started"}
                           onClick={async (e) => {
                             e.stopPropagation();
-                            await fetch(`/api/stop/${x.id}`, {
+                            await fetch(apiUrl(`/api/stop/${x.id}`), {
                               method: "POST",
                             });
                             refresh();
@@ -491,7 +492,7 @@ export default function ProjectView() {
                         <Button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            await fetch(`/api/resume/${x.id}`, {
+                            await fetch(apiUrl(`/api/resume/${x.id}`), {
                               method: "POST",
                             });
                             refresh();
@@ -511,7 +512,7 @@ export default function ProjectView() {
                             )
                           )
                             return;
-                          await fetch(`/api/delete/${x.id}`, {
+                          await fetch(apiUrl(`/api/delete/${x.id}`), {
                             method: "POST",
                           });
                           refresh();

@@ -2,6 +2,7 @@ import ImageJs from "image-js";
 import { v4 as uuidv4 } from "uuid";
 
 import { readImageAsBase64, svgToPng } from "../Editor/ImageTools";
+import { apiUrl } from "./api";
 
 export function download(url, name) {
   const a = document.createElement("a");
@@ -54,7 +55,7 @@ export async function createSettingsDotJson(data) {
 }
 
 export async function fetchJobs() {
-  const jobs = await fetch("/api/status", {
+  const jobs = await fetch(apiUrl("/api/status"), {
     method: "GET", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
     cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
@@ -83,7 +84,7 @@ export async function downloadSettings(data) {
 
 export async function runRegistration(data) {
   await saveSettings(data);
-  const response = await fetch(`/api/start/${data.id}`, {
+  const response = await fetch(apiUrl(`/api/start/${data.id}`), {
     //"http://localhost:4000/start" => "/start"
     method: "POST", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
@@ -115,7 +116,7 @@ export async function saveSettings(settings) {
     thumbnail,
   });
 
-  const response = await fetch(`/api/save/${id}`, {
+  const response = await fetch(apiUrl(`/api/save/${id}`), {
     //"http://localhost:4000/start" => "/start"
     method: "POST", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
@@ -190,7 +191,7 @@ export async function loadSettings(oldWorkingImages, settingsUploadedByUser) {
 export async function uploadImage(projectId, file) {
   const formData = new FormData();
   formData.append("image", file);
-  return fetch("/api/upload/" + projectId, {
+  return fetch(apiUrl(`/api/upload/${projectId}`), {
     method: "POST",
     body: formData,
   }).then((x) => x.json());
