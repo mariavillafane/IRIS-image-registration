@@ -12,7 +12,7 @@ export function useJsonReader(initialPath, method = "readAsDataURL") {
       setImageAsDataURL(reader.result);
     });
     reader[method](selectedFile); //reader.readAsDataURL(selectedFile);
-  }, [selectedFile]);
+  }, [selectedFile, method]);
   return [imageAsDataURL, setSelectedFile];
 }
 
@@ -34,10 +34,10 @@ export async function svgToPng(svgText, margin) {
   }
 
   // figure out the height and width from svg text
-  var match = svgText.match(/height=\"(\d+)/m);
-  var height = match && match[1] ? parseInt(match[1], 10) : 200;
-  var match = svgText.match(/width=\"(\d+)/m);
-  var width = match && match[1] ? parseInt(match[1], 10) : 200;
+  let matchH = svgText.match(/height="(\d+)/m);
+  let height = matchH && matchH[1] ? parseInt(matchH[1], 10) : 200;
+  let matchW = svgText.match(/width="(\d+)/m);
+  let width = matchW && matchW[1] ? parseInt(matchW[1], 10) : 200;
   margin = margin || 0;
 
   // create a canvas element to pass through

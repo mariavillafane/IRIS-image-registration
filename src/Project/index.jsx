@@ -1,5 +1,4 @@
 import {
-  Paper,
   Card,
   Box,
   Button,
@@ -15,15 +14,12 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
-  Modal,
   Dialog,
   DialogTitle,
   DialogContent,
 } from "@mui/material";
 
-import ArrowRightIcon from "@mui/icons-material/ArrowRight";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import InfoIcon from "@mui/icons-material/Info";
 import { useCallback, useEffect, useState } from "react";
 import EditIcon from "@mui/icons-material/Edit";
 import CameraIcon from "@mui/icons-material/Camera";
@@ -85,6 +81,7 @@ function ProjectCard({ refresh, ...p }) {
         <Link to={`/${p.id}`}>
           <img
             src={p.thumbnail}
+            alt={p.title || p.id}
             style={{ maxWidth: "384px", maxHeight: "384px" }}
           />
         </Link>
@@ -240,11 +237,13 @@ function Results({ id, files }) {
                   >
                     <img
                       src={`${image}`}
+                      alt={image.split("/").at(-1)}
                       style={{ maxWidth: "300px", maxHeight: "300px" }}
                     />
 
                     <a
                       target="_blank"
+                      rel="noreferrer noopener"
                       download={image.split("/").at(-1)}
                       href={image}
                       title="image"
@@ -282,7 +281,7 @@ export function JobResults(job) {
 }
 
 export function JobDetails(job) {
-  if (job.status == "error") {
+  if (job.status === "error") {
     return (
       <pre>
         <code>{job.message} </code>
@@ -313,9 +312,9 @@ export default function ProjectView() {
       method: "POST",
       body: data,
     }).then(refresh);
-  });
+  }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps } = useDropzone({
     onDrop,
   });
 
@@ -339,6 +338,7 @@ export default function ProjectView() {
             <a
               href="https://github.com/mariavillafane/registration-ui"
               target="_blank"
+              rel="noreferrer noopener"
             >
               About IRIS v.202601{" "}
             </a>
@@ -422,7 +422,7 @@ export default function ProjectView() {
                         height="96px"
                         overflow="hidden"
                       >
-                        <img src={x.thumbnail} height="96px" />
+                        <img src={x.thumbnail} height="96px" alt={x.id} />
                       </Box>
                       <Box>
                         <Box>{new Date(x.updated).toUTCString()} </Box>
@@ -437,7 +437,7 @@ export default function ProjectView() {
                         }}
                       >
                         <Box>{x.status}</Box>
-                        {x.status != "queued" &&
+                        {x.status !== "queued" &&
                           (!x.done ||
                             ["error", "success"].includes(x.status)) && (
                             <LinearProgress
@@ -472,9 +472,9 @@ export default function ProjectView() {
                         Download{" "}
                       </Button>
 
-                      {x.status != "stopped" && (
+                      {x.status !== "stopped" && (
                         <Button
-                          disabled={x.status != "started"}
+                          disabled={x.status !== "started"}
                           onClick={async (e) => {
                             e.stopPropagation();
                             await fetch(apiUrl(`/api/stop/${x.id}`), {
@@ -488,7 +488,7 @@ export default function ProjectView() {
                         </Button>
                       )}
 
-                      {x.status == "stopped" && (
+                      {x.status === "stopped" && (
                         <Button
                           onClick={async (e) => {
                             e.stopPropagation();

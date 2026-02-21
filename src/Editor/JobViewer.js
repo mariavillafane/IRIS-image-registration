@@ -21,7 +21,6 @@ import {
 import QueueIcon from "@mui/icons-material/Queue";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import GetAppIcon from "@mui/icons-material/GetApp";
 
 import { useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
@@ -110,10 +109,11 @@ function Results({ id, files }) {
                   maxWidth={"400px"}
                   padding="1em"
                 >
-                  <img src={`${image}`} />
+                  <img src={`${image}`} alt={image.split("/").at(-1)} />
 
                   <a
                     target="_blank"
+                    rel="noreferrer noopener"
                     download={image.split("/").at(-1)}
                     href={image}
                     title="image"
@@ -136,7 +136,7 @@ export function JobQueueViewer({ id }) {
   const [showDrawer, setShowDrawer] = useState(0);
 
   const fetchResults = async ({ id, status }) => {
-    if (status != "success") return;
+    if (status !== "success") return;
     console.log("feching", id, status);
     const resultingTransformedImageFiles = await fetch(
       apiUrl(`/api/results/${id}`),
@@ -171,7 +171,7 @@ export function JobQueueViewer({ id }) {
         anchor={"right"}
         onClose={() => setShowDrawer(0)}
       >
-        {showDrawer == 3 && (
+        {showDrawer === 3 && (
           <Stack spacing={2}>
             <Box display={"flex"}>
               <IconButton onClick={() => setShowDrawer(2)}>
@@ -213,7 +213,7 @@ export function JobQueueViewer({ id }) {
                 </Badge>
               </IconButton>
               <Typography marginLeft="0.25em" variant="h3">
-                {showDrawer == 2 ? "All Jobs" : "Completed Jobs"}
+                {showDrawer === 2 ? "All Jobs" : "Completed Jobs"}
               </Typography>
             </Box>
             <Divider />
@@ -250,7 +250,7 @@ export function JobQueueViewer({ id }) {
                           }}
                         >
                           <Box>{x.status}</Box>
-                          {x.status != "queued" && (
+                          {x.status !== "queued" && (
                             <LinearProgress
                               color={
                                 ["success", "error"].includes(x.status)

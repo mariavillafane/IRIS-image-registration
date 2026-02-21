@@ -5,7 +5,6 @@ import EditorView from "./Editor";
 import ProjectView from "./Project";
 import reportWebVitals from "./reportWebVitals";
 import { HashRouter, Route, Routes } from "react-router";
-import { apiUrl } from "./utils/api";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(

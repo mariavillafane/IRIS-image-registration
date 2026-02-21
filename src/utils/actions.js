@@ -1,7 +1,7 @@
 import ImageJs from "image-js";
 import { v4 as uuidv4 } from "uuid";
 
-import { readImageAsBase64, svgToPng } from "../Editor/ImageTools";
+import { svgToPng } from "../Editor/ImageTools";
 import { apiUrl } from "./api";
 
 export function download(url, name) {
@@ -62,11 +62,11 @@ export async function fetchJobs() {
   }).then((x) => x.json());
 
   const entries = Object.values(jobs);
-  const done = entries.filter((x) => x.status == "success").length;
-  const queued = entries.filter((x) => x.status == "queued").length;
-  const inProgress = entries.filter((x) => x.status == "started").length;
+  const done = entries.filter((x) => x.status === "success").length;
+  const queued = entries.filter((x) => x.status === "queued").length;
+  const inProgress = entries.filter((x) => x.status === "started").length;
   const total = entries.length;
-  const failed = entries.filter((x) => x.status == "failed").length;
+  const failed = entries.filter((x) => x.status === "failed").length;
   const jobsByProject = Object.groupBy(Object.values(jobs), (x) => x.projectId);
 
   return { done, queued, inProgress, failed, total, jobs, jobsByProject };

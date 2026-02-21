@@ -1,11 +1,6 @@
-import { useState, useRef, memo, useMemo } from "react";
+import { useState, useRef } from "react";
 import { Box } from "@mui/system";
-import {
-  ReactSVGPanZoom,
-  TOOL_NONE,
-  INITIAL_VALUE,
-  TOOL_PAN,
-} from "react-svg-pan-zoom";
+import { ReactSVGPanZoom, INITIAL_VALUE, TOOL_PAN } from "react-svg-pan-zoom";
 
 const CanvasImage = (props) => {
   const [retry, setRetry] = useState(0);
@@ -67,6 +62,8 @@ const ComparisonClipPathRectangle = ({ orientation, mousepos, w, h }) => {
       return (
         <rect x={0} y={0} width={mousepos.x} height={mousepos.y} /> //4
       );
+    default:
+      return null;
   }
 };
 
@@ -104,7 +101,7 @@ export function RegistrationCanvas(props) {
         onChangeTool={onChangeTool}
         toolbarProps={{ position: "left" }}
         onMouseDown={(e) => {
-          if (editorMode == "compare") {
+          if (editorMode === "compare") {
             props.dispatch({ type: "CANVAS_CYCLE_ORIENTATION" });
             return;
           }
@@ -211,7 +208,7 @@ export function RegistrationCanvas(props) {
                     //{...(editorMode === "compare" && i > 0   //applies curtainviewer to all but first image 260125
                     {...(editorMode === "compare" &&
                     ((props.selectedStackId &&
-                      stack.id == props.selectedStackId) ||
+                      stack.id === props.selectedStackId) ||
                       (!props.selectedStackId && i > 0))
                       ? { clipPath: "url(#clipPath)" }
                       : {})}

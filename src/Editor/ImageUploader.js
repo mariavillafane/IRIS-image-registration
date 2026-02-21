@@ -18,11 +18,9 @@ import {
   Snackbar,
   Tooltip,
 } from "@mui/material";
-import Image from "image-js";
 import ReplayIcon from "@mui/icons-material/Replay"; //rotation
 import LocationOnIcon from "@mui/icons-material/LocationOn"; //position
 import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge"; //scaling
-import PhotoSizeSelectActualIcon from "@mui/icons-material/PhotoSizeSelectActual"; //size
 import { uploadImage } from "../utils/actions";
 
 function computeNextId(stacks) {
@@ -62,9 +60,9 @@ function StackUploader({
         gap: "0.5rem",
         backgroundColor: "lightgray",
         border:
-          selectedStackId == stack.id && stack.id !== 0
+          selectedStackId === stack.id && stack.id !== 0
             ? "solid 3px coral"
-            : selectedStackId == stack.id && stack.id == 0
+            : selectedStackId === stack.id && stack.id === 0
             ? "solid 3px #321ab0"
             : "solid 3px transparent",
       }}
@@ -96,6 +94,7 @@ function StackUploader({
                   <img
                     width={!small ? "100px" : "50px"}
                     src={imageEntry.thumbnailUrl}
+                    alt={imageEntry.id || "thumbnail"}
                     onClick={() => setSelectedStackId(stack.id)}
                   />
                   <Typography
@@ -120,11 +119,6 @@ function StackUploader({
                         )
                       )
                         return;
-
-                      const newEntries = stack.imageEntries.filter(
-                        //newEntries are all the entries remaining (the ones not-deleted)
-                        (x) => x.id != imageEntry.id
-                      );
 
                       const basePath = imageEntry.files.url
                         .split("/")
@@ -177,7 +171,7 @@ function StackUploader({
               }}
               variant="outlined"
             >
-              {index != 0 ? "Add image to stack" : "Replace fixed image"}
+              {index !== 0 ? "Add image to stack" : "Replace fixed image"}
               <input
                 {...getInputProps()}
                 accept=".jpg, .png, .jpeg, .gif, .bmp, .tif, .tiff|image/*"
@@ -264,7 +258,7 @@ export function ImageUploader({
     );
 
     const { width, height } = imageEntries[0];
-    if (!imageEntries.every((x) => x.width == width && x.height == height)) {
+    if (!imageEntries.every((x) => x.width === width && x.height === height)) {
       console.log(
         "some images differ in size => not all widths and heights of images of stack are the same"
       );
@@ -316,7 +310,7 @@ export function ImageUploader({
     );
 
     const { width, height } = imageEntries[0];
-    if (!imageEntries.every((x) => x.width == width && x.height == height)) {
+    if (!imageEntries.every((x) => x.width === width && x.height === height)) {
       console.log(
         "some images differ in size => not all widths and heights of images of stack are the same"
       );
