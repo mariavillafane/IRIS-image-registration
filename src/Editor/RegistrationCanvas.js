@@ -75,19 +75,14 @@ export function RegistrationCanvas(props) {
   const Viewer = useRef(null);
   const [tool, onChangeTool] = useState(TOOL_PAN);
   const [value, onChangeValue] = useState(INITIAL_VALUE);
-  const [dragStart, setDragStart] = useState(null);
 
   const w = (props.stacks?.[0]?.x || 0) + (props.stacks?.[0]?.width || 0);
   const h = (props.stacks?.[0]?.y || 0) + (props.stacks?.[0]?.height || 0);
-  const { editorMode } = props; //here just calling the "editorMode" prop passed from parent
-  const [mousepos, setMousepos] = useState({ x: 0, y: 0 });
-  const [orientation, setOrientation] = useState(0);
-
-  console.log(mousepos);
+  const { editorMode } = props;
 
   return (
     <Box
-      onMouseLeave={() => setDragStart(null)}
+      onMouseLeave={() => props.dispatch({ type: "CANVAS_DRAG_END" })}
       ref={ref}
       width="100%"
       grow={1}
@@ -110,54 +105,48 @@ export function RegistrationCanvas(props) {
         toolbarProps={{ position: "left" }}
         onMouseDown={(e) => {
           if (editorMode == "compare") {
-            setOrientation(orientation + 1);
+            props.dispatch({ type: "CANVAS_CYCLE_ORIENTATION" });
             return;
           }
           if (e.originalEvent?.target?.dataset?.stackId === undefined) return;
-          //const index = +e.originalEvent.target.dataset.id; //here  index == stackIndex
-          const stackIndex = +e.originalEvent.target.dataset.stackIndex; //here  index == stackIndex
+          const stackIndex = +e.originalEvent.target.dataset.stackIndex;
           const stackId = +e.originalEvent.target.dataset.stackId;
-          const { clientX, clientY } = e.originalEvent;
-          const { x, y } = props.stacks[stackIndex];
-          setDragStart([
-            clientX / e.value.a,
-            clientY / e.value.d,
-            x,
-            y,
-            stackIndex,
-          ]);
+          props.dispatch({
+            type: "CANVAS_DRAG_START",
+            payload: {
+              stackIndex,
+              stackId,
+              clientX: e.originalEvent.clientX,
+              clientY: e.originalEvent.clientY,
+              svgScaleX: e.value.a,
+              svgScaleY: e.value.d,
+            },
+          });
           props.setSelectedStackId(stackId);
-          console.log("image_id", stackIndex);
-          console.log("selected_stack_id", props.selectedStackId); //selectedStackId
         }}
         onMouseMove={(e) => {
-          //console.log("ytytyu", e);
           const { clientX, clientY } = e.originalEvent;
-          setMousepos({
-            x: Math.round(e.x),
-            y: Math.round(e.y),
+          props.dispatch({
+            type: "CANVAS_UPDATE_MOUSEPOS",
+            payload: {
+              x: Math.round(e.x),
+              y: Math.round(e.y),
+            },
           });
-          if (!dragStart) return;
-          console.log(e);
-          const id = dragStart[4];
-          const [x, y] = [
-            Math.round(clientX / e.value.a - dragStart[0] + dragStart[2]),
-            Math.round(clientY / e.value.d - dragStart[1] + dragStart[3]),
-          ];
-          const stacks = props.stacks.with(id, { ...props.stacks[id], x, y });
-          props.setStacks(stacks);
+          if (!props.dragStart) return;
+          props.dispatch({
+            type: "CANVAS_DRAG_MOVE",
+            payload: {
+              clientX,
+              clientY,
+              svgScaleX: e.value.a,
+              svgScaleY: e.value.d,
+            },
+          });
         }}
         onMouseUp={(e) => {
-          if (!dragStart) return;
-          const id = dragStart[4];
-          const { clientX, clientY } = e.originalEvent;
-          const [x, y] = [
-            Math.round(clientX / e.value.a - dragStart[0] + dragStart[2]),
-            Math.round(clientY / e.value.d - dragStart[1] + dragStart[3]),
-          ];
-          const stacks = props.stacks.with(id, { ...props.stacks[id], x, y });
-          props.setStacks(stacks);
-          setDragStart(null);
+          if (!props.dragStart) return;
+          props.dispatch({ type: "CANVAS_DRAG_END" });
         }}
       >
         <svg width={w} height={h}>
@@ -191,8 +180,8 @@ export function RegistrationCanvas(props) {
             </pattern>
             <clipPath id="clipPath">
               <ComparisonClipPathRectangle
-                orientation={orientation}
-                mousepos={mousepos}
+                orientation={props.orientation}
+                mousepos={props.mousepos}
                 w={w}
                 h={h}
               />

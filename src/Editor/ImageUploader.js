@@ -47,7 +47,7 @@ function StackUploader({
   index,
   selectedStackId,
   setSelectedStackId,
-  setStacks,
+  dispatch,
   stacks,
   small,
   onDropImageToStack,
@@ -134,21 +134,10 @@ function StackUploader({
                         console.error
                       );
 
-                      //window.URL.revokeObjectURL(imageEntry.imageUrl); //delete image
-
-                      if (newEntries.length == 0) {
-                        setStacks([
-                          ...stacks.slice(0, index),
-                          ...stacks.slice(index + 1, stack.length),
-                        ]);
-                      } else {
-                        setStacks(
-                          stacks.with(index, {
-                            ...stack,
-                            imageEntries: newEntries,
-                          })
-                        );
-                      }
+                      dispatch({
+                        type: "DELETE_IMAGE_ENTRY",
+                        payload: { stackIndex: index, entryIndex },
+                      });
                     }}
                   />
 
@@ -157,16 +146,14 @@ function StackUploader({
                     icon={<VisibilityOffSharpIcon />}
                     checkedIcon={<VisibilitySharpIcon color="primary" />}
                     onChange={(event) => {
-                      const newEntries = stack.imageEntries.with(entryIndex, {
-                        ...imageEntry,
-                        checked: event.target.checked,
+                      dispatch({
+                        type: "TOGGLE_IMAGE_VISIBILITY",
+                        payload: {
+                          stackIndex: index,
+                          entryIndex,
+                          checked: event.target.checked,
+                        },
                       });
-                      setStacks(
-                        stacks.with(index, {
-                          ...stack,
-                          imageEntries: newEntries,
-                        })
-                      );
                     }}
                   />
                 </Box>
@@ -241,7 +228,7 @@ function StackUploader({
 export function ImageUploader({
   projectId,
   stacks,
-  setStacks,
+  dispatch,
   selectedStackId,
   setSelectedStackId,
   small = false,
@@ -295,7 +282,10 @@ export function ImageUploader({
       height,
     };
     console.log("adding", stack);
-    setStacks((stacks) => [...stacks, stack]);
+    dispatch({
+      type: "ADD_STACK",
+      payload: stack,
+    });
   }
 
   async function onDropImageToStack(
@@ -333,21 +323,15 @@ export function ImageUploader({
     }
 
     if (allowMultiple) {
-      setStacks((stacks) =>
-        stacks.with(index, {
-          ...stack,
-          imageEntries: [...stack.imageEntries, ...imageEntries], //stackWithMoreImages
-        })
-      );
+      dispatch({
+        type: "ADD_IMAGES_TO_STACK",
+        payload: { stackIndex: index, imageEntries },
+      });
     } else {
-      setStacks((stacks) =>
-        stacks.with(index, {
-          ...stack,
-          width,
-          height,
-          imageEntries,
-        })
-      );
+      dispatch({
+        type: "REPLACE_STACK_IMAGES",
+        payload: { stackIndex: index, width, height, imageEntries },
+      });
     }
   }
 
@@ -415,7 +399,7 @@ export function ImageUploader({
               index={index}
               setSelectedStackId={setSelectedStackId}
               selectedStackId={selectedStackId}
-              setStacks={setStacks}
+              dispatch={dispatch}
               stacks={stacks}
               small={small}
               onDropImageToStack={onDropImageToStack}
@@ -459,7 +443,7 @@ export function ImageUploader({
               index={index + 1}
               setSelectedStackId={setSelectedStackId}
               selectedStackId={selectedStackId}
-              setStacks={setStacks}
+              dispatch={dispatch}
               stacks={stacks}
               small={small}
               onDropImageToStack={onDropImageToStack}
