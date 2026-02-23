@@ -72,6 +72,7 @@ export function RegistrationCanvas(props) {
   const Viewer = useRef(null);
   const [tool, onChangeTool] = useState(TOOL_PAN);
   const [value, onChangeValue] = useState(INITIAL_VALUE);
+  const [dragStart, setDragStart] = useState(null);
 
   const w = (props.stacks?.[0]?.x || 0) + (props.stacks?.[0]?.width || 0);
   const h = (props.stacks?.[0]?.y || 0) + (props.stacks?.[0]?.height || 0);
@@ -79,7 +80,11 @@ export function RegistrationCanvas(props) {
 
   return (
     <Box
-      onMouseLeave={() => props.dispatch({ type: "CANVAS_DRAG_END" })}
+      onMouseLeave={() => {
+        //if (dragStart)
+        // props.dispatch({ type: "CANVAS_DRAG_END" });
+        setDragStart(null);
+      }} //in case mouse is released outside of canvas}
       ref={ref}
       width="100%"
       grow={1}
@@ -108,17 +113,17 @@ export function RegistrationCanvas(props) {
           if (e.originalEvent?.target?.dataset?.stackId === undefined) return;
           const stackIndex = +e.originalEvent.target.dataset.stackIndex;
           const stackId = +e.originalEvent.target.dataset.stackId;
-          props.dispatch({
-            type: "CANVAS_DRAG_START",
-            payload: {
-              stackIndex,
-              stackId,
-              clientX: e.originalEvent.clientX,
-              clientY: e.originalEvent.clientY,
-              svgScaleX: e.value.a,
-              svgScaleY: e.value.d,
-            },
-          });
+          const stack = props.stacks[stackIndex];
+          const svgScaleX = e.value.a;
+          const svgScaleY = e.value.d;
+          setDragStart([
+            e.originalEvent.clientX / svgScaleX,
+            e.originalEvent.clientY / svgScaleY,
+            stack.x,
+            stack.y,
+            stackIndex,
+          ]);
+          props.dispatch({ type: "CANVAS_DRAG_START" });
           props.setSelectedStackId(stackId);
         }}
         onMouseMove={(e) => {
@@ -130,7 +135,7 @@ export function RegistrationCanvas(props) {
               y: Math.round(e.y),
             },
           });
-          if (!props.dragStart) return;
+          if (!dragStart) return;
           props.dispatch({
             type: "CANVAS_DRAG_MOVE",
             payload: {
@@ -138,12 +143,15 @@ export function RegistrationCanvas(props) {
               clientY,
               svgScaleX: e.value.a,
               svgScaleY: e.value.d,
+              dragStart,
             },
           });
         }}
         onMouseUp={(e) => {
-          if (!props.dragStart) return;
-          props.dispatch({ type: "CANVAS_DRAG_END" });
+          if (!dragStart) return;
+          setDragStart(null);
+
+          //props.dispatch({ type: "CANVAS_DRAG_END" });
         }}
       >
         <svg width={w} height={h}>

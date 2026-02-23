@@ -115,12 +115,12 @@ export function EditorAppBar({
           <Tooltip title="Undo">
             <span>
               <Badge
-                badgeContent={Math.max(0, state.past.length - 1)}
+                badgeContent={Math.max(0, state.past.length - 2)}
                 color="secondary"
                 max={99}
               >
                 <IconButton
-                  disabled={state.past.length <= 1}
+                  disabled={state.past.length <= 2}
                   size="small"
                   onClick={handleUndo}
                 >

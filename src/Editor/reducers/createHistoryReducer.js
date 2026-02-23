@@ -2,7 +2,7 @@ const createHistoryReducer = (
   baseReducer,
   ignoreEvents = [
     "CANVAS_DRAG_MOVE",
-    "CANVAS_DRAG_START",
+    //"CANVAS_DRAG_START",
     "CANVAS_UPDATE_MOUSEPOS",
   ]
 ) => {
@@ -86,10 +86,10 @@ const createHistoryReducer = (
     }
 
     // If reducer returned identical state, do nothing (avoid duplicate history entry)
-    if (isEqual(newPresent, state.present)) {
-      console.log("No state change detected; not adding to history");
-      return state;
-    }
+    // if (isEqual(newPresent, state.present)) {
+    //   console.log("No state change detected; not adding to history");
+    //   return state;
+    // }
 
     // Normal action -> push current present into past with meta
     const meta = buildMeta(action);
@@ -97,7 +97,7 @@ const createHistoryReducer = (
       past: [...state.past, state.present],
       present: newPresent,
       future: [],
-      pastMeta: [...state.pastMeta, state.presentMeta],
+      pastMeta: [...state.pastMeta, meta],
       presentMeta: meta,
       futureMeta: [],
     };

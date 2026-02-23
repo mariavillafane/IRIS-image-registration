@@ -29,6 +29,7 @@ function usePersistentState(name, defaultValue) {
 function App() {
   const panelRef = useRef();
   const { id } = useParams();
+
   const initialPresent = {
     loading: true,
     id,
@@ -38,6 +39,7 @@ function App() {
     mousepos: { x: 0, y: 0 },
     orientation: 0,
   };
+
   const [state, dispatch] = useReducer(createHistoryReducer(settingsReducer), {
     past: [],
     present: initialPresent,

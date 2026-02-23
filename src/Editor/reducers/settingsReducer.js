@@ -32,45 +32,25 @@ const settingsReducer = (state, action) => {
         }),
       };
     }
-    case "CANVAS_DRAG_START": {
-      console.log("CANVAS_DRAG_START");
-      const { stackIndex, clientX, clientY, svgScaleX, svgScaleY } =
-        action.payload;
-      const stack = state.workingImages[stackIndex];
-      return {
-        ...state,
-        dragStart: [
-          clientX / svgScaleX,
-          clientY / svgScaleY,
-          stack.x,
-          stack.y,
-          stackIndex,
-        ],
-      };
-    }
+
     case "CANVAS_DRAG_MOVE": {
-      const { clientX, clientY, svgScaleX, svgScaleY } = action.payload;
-      if (!state.dragStart) return state;
+      const { clientX, clientY, svgScaleX, svgScaleY, dragStart } =
+        action.payload;
+      if (!dragStart) return state;
       const [x, y] = [
-        Math.round(
-          clientX / svgScaleX - state.dragStart[0] + state.dragStart[2]
-        ),
-        Math.round(
-          clientY / svgScaleY - state.dragStart[1] + state.dragStart[3]
-        ),
+        Math.round(clientX / svgScaleX - dragStart[0] + dragStart[2]),
+        Math.round(clientY / svgScaleY - dragStart[1] + dragStart[3]),
       ];
       return {
         ...state,
-        workingImages: state.workingImages.with(state.dragStart[4], {
-          ...state.workingImages[state.dragStart[4]],
+        workingImages: state.workingImages.with(dragStart[4], {
+          ...state.workingImages[dragStart[4]],
           x,
           y,
         }),
       };
     }
-    case "CANVAS_DRAG_END":
-      console.log("CANVAS_DRAG_END");
-      return { ...state, dragStart: null };
+
     case "CANVAS_UPDATE_MOUSEPOS": {
       return {
         ...state,
