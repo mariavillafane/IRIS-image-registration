@@ -25,6 +25,9 @@ dependencies:
   - py-opencv=3.4.2
   - wheel=0.37.1
 
+  #new
+  #- opencv-python-headless=4.5.5.64
+
   # - blas=1.0=mkl
   # - ca-certificates=2022.4.26
   # - certifi=2021.5.30
