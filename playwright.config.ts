@@ -17,7 +17,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:4000",
+    baseURL: "http://localhost:4100",
     trace: "retain-on-failure",
     // Every test is recorded (test-results/<test>/video.webm) and browsable
     // in the HTML report: `yarn e2e:report`.
@@ -31,8 +31,10 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "node scripts/e2e-server.mjs",
-    url: "http://localhost:4000/api/server-info",
-    reuseExistingServer: !process.env.CI,
+    // dedicated e2e port: tests must never run against a foreign server
+    // (e.g. a locally running IRIS docker container on 4000)
+    url: "http://localhost:4100/api/server-info",
+    reuseExistingServer: false,
     timeout: 300_000,
     stdout: "pipe",
     stderr: "pipe",

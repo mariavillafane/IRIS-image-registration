@@ -88,12 +88,17 @@ if (
   console.log("[e2e-server] server build is up to date");
 }
 
-// 3. Start the backend exactly like the Docker image does.
+// 3. Start the backend exactly like the Docker image does, but on the
+// dedicated e2e port so it never clashes with a locally running IRIS
+// instance (docker container or dev server on 4000).
+const E2E_PORT = 4100;
+
 const child = spawn("node", ["dist/index.js"], {
   cwd: serverDir,
-  env: { ...process.env, NODE_ENV: "production" },
+  env: { ...process.env, NODE_ENV: "production", PORT: String(E2E_PORT) },
   stdio: "inherit",
 });
+console.log(`[e2e-server] starting backend on port ${E2E_PORT}`);
 
 const shutdown = (signal) => {
   child.kill(signal);

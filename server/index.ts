@@ -9,7 +9,9 @@ import { importApi } from "./services/import.js";
 
 const app = express(); //express() creates a http server
 
-const port = 4000;
+// PORT is honored so the e2e suite can run alongside a locally running
+// IRIS instance (production/Docker keeps the default 4000).
+const port = Number(process.env.PORT) || 4000;
 
 mkdirp("tmp");
 loadTasks();
