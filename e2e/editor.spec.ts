@@ -350,6 +350,67 @@ test.describe("editor canvas", () => {
     await expect(moving).toHaveAttribute("transform", /rotate\(90,/);
   });
 
+  test("shows a toast when undoing and redoing", async ({ page }) => {
+    await openEditorWithImages(page);
+    // two uploads + the rename = 3 history entries, so undo is enabled
+    await page.getByLabel("project name", { exact: true }).fill("Toast test");
+
+    await page.getByRole("button", { name: "undo" }).click();
+    await expect(page.getByText(/Undid SET_TITLE @/)).toBeVisible();
+    // the snackbar auto-hides after 3s
+    await expect(page.getByText(/Undid SET_TITLE @/)).toBeHidden({
+      timeout: 6000,
+    });
+
+    await page.getByRole("button", { name: "redo" }).click();
+    await expect(page.getByText(/Redid SET_TITLE @/)).toBeVisible();
+  });
+
+  test("shows an upload progress toast while images are uploading", async ({
+    page,
+  }) => {
+    const pid = newProjectId();
+    await mockEditorApi(page);
+    await openEditor(page, pid);
+
+    // delay the uploads so the transient progress snackbar stays visible
+    await page.route(/\/api\/upload\//, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      const base = "/api/uploads/" + pid + "/images/mock";
+      const files = {
+        url: base + "/mock.png",
+        path: "uploads/" + pid + "/images/mock/mock.png",
+        webUrl: base + "/mock.web.png",
+        smallUrl: base + "/mock.128.png",
+        mediumUrl: base + "/mock.512.png",
+      };
+      return route.fulfill({
+        json: {
+          metadata: {
+            format: "png",
+            width: 64,
+            height: 48,
+            files,
+            destination: "uploads/" + pid + "/images/mock",
+            size: 1234,
+            uploaded: Date.now(),
+            sizeStr: "1.2 kB",
+          },
+          ...files,
+        },
+      });
+    });
+
+    // no fixed image uploaded yet, so the moving stack becomes stack 0
+    await uploadTo(page, "dropzone-moving", [movingBlue(), movingGreen()]);
+    await expect(page.getByText(/Uploading \d+ \/ \d+/)).toBeVisible();
+
+    await expect(
+      page.locator('.myCanvas > svg image[data-stack-id="0"]')
+    ).toHaveCount(2);
+    await expect(page.getByText(/Uploading \d+ \/ \d+/)).toBeHidden();
+  });
+
   test("runs a (mocked) registration and shows the results drawer", async ({
     page,
   }) => {

@@ -4,7 +4,9 @@
 //  - backends: node dist/index.js whose working directory is .../server
 // Anything else listening on the e2e port (docker, dev servers, ...) is left
 // alone; playwright reports a clear port-in-use error in that case.
-import { readdirSync, readFileSync, readlinkSync } from "node:fs";
+import { readdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const isWindows = process.platform === "win32";
 if (isWindows) process.exit(0);

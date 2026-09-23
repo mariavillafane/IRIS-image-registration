@@ -1,10 +1,24 @@
 import { expect, test } from "@playwright/test";
-import { createPng } from "./helpers/png";
-import { makeJob, mockResultsApi, type Job } from "./helpers/mocks";
+import { createPng, pngFile } from "./helpers/png";
+import {
+  cleanupProject,
+  makeJob,
+  mockResultsApi,
+  openEditor,
+  uploadTo,
+  type Job,
+} from "./helpers/mocks";
 
 const tinyThumbnail =
   "data:image/png;base64," +
   createPng({ width: 8, height: 8, left: [200, 40, 40] }).toString("base64");
+
+let currentProjectId: string | undefined;
+
+test.afterEach(async ({ request }) => {
+  if (currentProjectId) await cleanupProject(request, currentProjectId);
+  currentProjectId = undefined;
+});
 
 const demoProject = {
   id: "project-e2e-demo",
@@ -114,19 +128,54 @@ test.describe("projects overview", () => {
     ).toBeVisible();
   });
 
-  test("deletes a project after confirmation", async ({ page }) => {
-    await mockProjectsApi(page, [demoProject]);
-    let deleted = false;
-    await page.route(/\/api\/delete\//, (route) => {
-      deleted = true;
-      return route.fulfill({ json: {} });
-    });
-    page.on("dialog", (dialog) => dialog.accept());
+  test("deletes a project after confirmation (overview + server state)", async ({
+    page,
+    request,
+  }) => {
+    // build real server-side state first: a project with an uploaded image
+    currentProjectId = `project-e2e-del-${Date.now()}`;
+    await page.route(/\/api\/status$/, (route) => route.fulfill({ json: {} }));
+    await openEditor(page, currentProjectId);
+    await uploadTo(page, "dropzone-fixed", [
+      pngFile("fixed-del.png", {
+        width: 64,
+        height: 48,
+        left: [90, 30, 160],
+        right: [30, 160, 90],
+      }),
+    ]);
+    await expect(
+      page.locator('.myCanvas > svg image[data-stack-id="0"]')
+    ).toHaveCount(1);
+
+    // wait for the real (debounced) autosave so /api/projects lists it
+    await page.waitForResponse(
+      (response) =>
+        /\/api\/save\//.test(response.url()) && response.status() === 200,
+      { timeout: 20_000 }
+    );
 
     await page.goto("/registration-ui/");
-    await page.getByRole("button", { name: "SpeedDial basic example" }).click();
-    await page.locator(".MuiSpeedDialAction-fab").nth(3).click(); // Delete action
+    // scope to our card - the real overview may also list leftover projects
+    const projectCard = page.locator(".project-card", {
+      hasText: currentProjectId,
+    });
+    await expect(projectCard).toBeVisible();
 
-    await expect.poll(() => deleted).toBe(true);
+    // delete it through the speed dial (window.confirm is auto-accepted)
+    page.on("dialog", (dialog) => dialog.accept());
+    await projectCard
+      .getByRole("button", { name: "SpeedDial basic example" })
+      .click();
+    await projectCard.locator(".MuiSpeedDialAction-fab").nth(3).click(); // Delete action
+
+    // the overview refreshes and the card disappears
+    await expect(projectCard).toHaveCount(0, { timeout: 15_000 });
+
+    // and the server removed the project files
+    const settings = await request.get(
+      `/api/uploads/${currentProjectId}/settings.json`
+    );
+    expect(settings.status()).toBe(404);
   });
 });
