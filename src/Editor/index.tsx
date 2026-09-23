@@ -1,5 +1,6 @@
 import "./App.css";
 import { useEffect, useRef, useState, useReducer } from "react";
+import type { ReactNode } from "react";
 import { RegistrationCanvas } from "./RegistrationCanvas";
 import { ImageUploader } from "./ImageUploader";
 import { EditorAppBar } from "./EditorAppBar";
@@ -12,27 +13,36 @@ import { Divider, Snackbar, Alert } from "@mui/material";
 import { saveSettings } from "../utils/actions";
 import { useParams } from "react-router";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import type { ImperativePanelHandle } from "react-resizable-panels";
+import type {
+  EditorSettings,
+  HistoryState,
+  ProjectSettingsDoc,
+} from "../types";
 
-function usePersistentState(name, defaultValue) {
-  const [state, setState] = useState(
+function usePersistentState<T extends string | number>(
+  name: string,
+  defaultValue: T
+): [T | string, (value: T | string) => void] {
+  const [state, setState] = useState<T | string>(
     () => localStorage.getItem(name) || defaultValue
   );
   return [
     state,
     (value) => {
-      localStorage.setItem(name, value);
+      localStorage.setItem(name, String(value));
       setState(value);
     },
   ];
 }
 
-function App() {
-  const panelRef = useRef();
+function App(): ReactNode {
+  const panelRef = useRef<ImperativePanelHandle>(null);
   const { id } = useParams();
 
-  const initialPresent = {
+  const initialPresent: EditorSettings = {
     loading: true,
-    id,
+    id: id ?? "",
     worldScale: 1.0,
     workingImages: [],
     dragStart: null,
@@ -47,19 +57,24 @@ function App() {
     pastMeta: [],
     presentMeta: { type: "INIT", time: Date.now(), label: "Init" },
     futureMeta: [],
-  });
+  } as HistoryState<EditorSettings>);
   const settingsJson = state.present;
 
   const [snack, setSnack] = useState({ open: false, message: "" });
 
-  const handleUndoRedo = (snackData) => {
+  const handleUndoRedo = (snackData: { message: string }) => {
     setSnack({ open: true, ...snackData });
   };
 
   useEffect(() => {
     fetch(`/api/uploads/${id}/settings.json`)
-      .then((res) => res.json())
-      .then((data) => dispatch({ type: "SET_SETTINGS", payload: data }))
+      .then((res) => res.json() as Promise<ProjectSettingsDoc>)
+      .then((data) =>
+        dispatch({
+          type: "SET_SETTINGS",
+          payload: data as unknown as EditorSettings,
+        })
+      )
       .catch(() => dispatch({ type: "SET_LOADING", payload: false }));
   }, [id]);
 
@@ -69,7 +84,10 @@ function App() {
   const [selectedStackId, setSelectedStackId] = useState(0);
   const [inProgress, setInProgress] = useState(false);
 
-  const [zoomPower, setZoomPower] = usePersistentState("zoomPower", 0.01);
+  const [zoomPower, setZoomPower] = usePersistentState<number>(
+    "zoomPower",
+    0.01
+  );
   const [collapse, setCollapse] = useState(false);
 
   const [editorMode, setEditorMode] = useState("edit");
@@ -95,7 +113,7 @@ function App() {
         justifyContent: "stretch",
         alignContent: "stretch",
         alignItems: "stretch",
-        grow: 1,
+        flexGrow: 1,
       }}
     >
       <EditorAppBar
@@ -130,14 +148,13 @@ function App() {
 
       <PanelGroup
         direction="horizontal"
-        autoSave={true}
         autoSaveId={"registration canvas"}
         style={{
           display: "flex",
           flexDirection: "row",
           width: "100%",
           height: "100%",
-          grow: 1,
+          flexGrow: 1,
           justifyContent: "stretch",
           alignItems: "stretch",
           alignContent: "stretch",
@@ -149,8 +166,8 @@ function App() {
             setSelectedStackId={setSelectedStackId}
             dispatch={dispatch}
             dragStart={settingsJson.dragStart}
-            mousepos={settingsJson.mousepos}
-            orientation={settingsJson.orientation}
+            mousepos={settingsJson.mousepos ?? { x: 0, y: 0 }}
+            orientation={settingsJson.orientation ?? 0}
             stacks={stacks}
             worldScale={worldScale}
             zoomPower={zoomPower}
@@ -163,20 +180,25 @@ function App() {
             margin: 0,
           }}
         >
-          <Divider orientation="vertical" width="2px" margin="0" padding={0}>
+          <Divider
+            orientation="vertical"
+            sx={{ width: "2px", margin: 0, padding: 0 }}
+          >
             <UnfoldMoreIcon
               sx={{ transform: "rotate(90deg)" }}
               onDoubleClick={() => {
                 const smallSize =
-                  (150 / document.querySelector(".App").clientWidth) * 100;
-                console.log(panelRef.current.size, smallSize);
-                if (panelRef.current.getSize() > smallSize + 1) {
-                  panelRef.current.resize(smallSize);
+                  (150 / (document.querySelector(".App")?.clientWidth || 1)) *
+                  100;
+                console.log(panelRef.current?.getSize(), smallSize);
+                if ((panelRef.current?.getSize() ?? 0) > smallSize + 1) {
+                  panelRef.current?.resize(smallSize);
                   setCollapse(true);
                 } else {
                   const mediumSize =
-                    (600 / document.querySelector(".App").clientWidth) * 100;
-                  panelRef.current.resize(mediumSize);
+                    (600 / (document.querySelector(".App")?.clientWidth || 1)) *
+                    100;
+                  panelRef.current?.resize(mediumSize);
                   setCollapse(false);
                 }
               }}
@@ -192,9 +214,12 @@ function App() {
           collapsible={true}
           onResize={() => {
             const smallSize =
-              (150 / document.querySelector(".App").clientWidth) * 100;
-            console.log(panelRef.current.size, smallSize);
-            if (panelRef.current.getSize() > smallSize + 1 && collapse) {
+              (150 / (document.querySelector(".App")?.clientWidth || 1)) * 100;
+            console.log(panelRef.current?.getSize(), smallSize);
+            if (
+              (panelRef.current?.getSize() ?? 0) > smallSize + 1 &&
+              collapse
+            ) {
               setCollapse(false);
             }
           }}

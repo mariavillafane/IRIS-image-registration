@@ -3,8 +3,16 @@ import { v4 as uuidv4 } from "uuid";
 
 import { svgToPng } from "../Editor/ImageTools";
 import { apiUrl } from "./api";
+import type {
+  EditorSettings,
+  JobQueueSummary,
+  ProjectSettingsDoc,
+  Task,
+  UploadImageResponse,
+  WorkingImage,
+} from "../types";
 
-export function download(url, name) {
+export function download(url: string, name: string): void {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
@@ -13,8 +21,10 @@ export function download(url, name) {
   document.body.removeChild(a);
 }
 
-export const blobToBase64 = function (blobUrl) {
-  return new Promise((resolve, reject) => {
+export const blobToBase64 = function (
+  blobUrl: string
+): Promise<string | undefined> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
     let img = new Image();
     img.onload = () => resolve(img);
     img.onerror = (err) => reject(err);
@@ -30,32 +40,43 @@ export const blobToBase64 = function (blobUrl) {
       canvas.width = w;
       canvas.height = h;
       let ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("could not create a 2d context");
+
       ctx.drawImage(img, 0, 0);
 
       return canvas.toDataURL();
     })
-    .catch(console.log);
+    .catch((e) => {
+      console.log(e);
+      return undefined;
+    });
 };
 
-export async function downloadCanvas() {
-  const svgAsString = document.querySelector(".myCanvas svg").outerHTML; //this is a string representative of myCanvas
-  const png = await svgToPng(svgAsString, 0, "white");
+function getCanvasSvgString(): string | null {
+  return document.querySelector<SVGElement>(".myCanvas svg")?.outerHTML ?? null;
+}
+
+export async function downloadCanvas(): Promise<void> {
+  const svgAsString = getCanvasSvgString();
+  if (!svgAsString) return; // no canvas rendered
+  const png = await svgToPng(svgAsString, 0);
   const name = "canvas-" + new Date().toISOString().split("T")[0] + ".png";
   download(png, name);
 }
 
-export async function saveCanvas() {
-  const svgAsString = document.querySelector(".myCanvas svg").outerHTML; //this is a string representative of myCanvas
-  const png = await svgToPng(svgAsString, 0, "white");
+export async function saveCanvas(): Promise<void> {
+  const svgAsString = getCanvasSvgString();
+  if (!svgAsString) return; // no canvas rendered
+  const png = await svgToPng(svgAsString, 0);
   localStorage.setItem("preview", png);
 }
 
-export async function createSettingsDotJson(data) {
+export async function createSettingsDotJson(data: unknown): Promise<string> {
   return JSON.stringify(data, null, 2);
 }
 
-export async function fetchJobs() {
-  const jobs = await fetch(apiUrl("/api/status"), {
+export async function fetchJobs(): Promise<JobQueueSummary> {
+  const jobs: Record<string, Task> = await fetch(apiUrl("/api/status"), {
     method: "GET", // *GET, POST, PUT, DELETE, etc.
     mode: "cors", // no-cors, *cors, same-origin
     cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
@@ -72,7 +93,7 @@ export async function fetchJobs() {
   return { done, queued, inProgress, failed, total, jobs, jobsByProject };
 }
 
-export async function downloadSettings(data) {
+export async function downloadSettings(data: EditorSettings): Promise<void> {
   const settingsJson = await createSettingsDotJson(data);
 
   const settings = window.URL.createObjectURL(
@@ -82,7 +103,7 @@ export async function downloadSettings(data) {
   window.URL.revokeObjectURL(settings); //delete object after creating it
 }
 
-export async function runRegistration(data) {
+export async function runRegistration(data: EditorSettings): Promise<Task> {
   await saveSettings(data);
   const response = await fetch(apiUrl(`/api/start/${data.id}`), {
     //"http://localhost:4000/start" => "/start"
@@ -98,21 +119,23 @@ export async function runRegistration(data) {
     referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin
   });
 
-  const statusOfResult = await response.json();
+  const statusOfResult: Task = await response.json();
   console.log(statusOfResult);
   return statusOfResult;
 }
 
-export async function saveSettings(settings) {
+export async function saveSettings(settings: EditorSettings): Promise<unknown> {
   const id = settings.id || uuidv4();
 
-  const svgAsString = document.querySelector(".myCanvas svg").outerHTML; //this is a string representative of myCanvas
-  const thumbnail = await svgToPng(svgAsString, 0, "white");
+  const svgAsString = getCanvasSvgString(); //this is a string representative of myCanvas
+  if (!svgAsString) throw new Error("canvas is not rendered");
+
+  const thumbnail = await svgToPng(svgAsString, 0);
   console.log({ thumbnail });
 
   const settingsJson = await createSettingsDotJson({
     id,
-    ...settings,
+    ...(settings as Omit<EditorSettings, "id">),
     thumbnail,
   });
 
@@ -135,18 +158,21 @@ export async function saveSettings(settings) {
   return statusOfResult;
 }
 
-export async function loadSettings(oldWorkingImages, settingsUploadedByUser) {
+export async function loadSettings(
+  oldWorkingImages: WorkingImage[],
+  settingsUploadedByUser: File | null
+): Promise<{ worldScale?: number; workingImages: WorkingImage[] } | undefined> {
   if (settingsUploadedByUser == null) return;
 
   const reader = new FileReader();
-  const fileContent = await new Promise((done) => {
+  const fileContent = await new Promise<string | ArrayBuffer | null>((done) => {
     reader.addEventListener("load", () => {
       done(reader.result);
     });
     reader.readAsText(settingsUploadedByUser);
   });
 
-  const parsedSettings = JSON.parse(fileContent);
+  const parsedSettings = JSON.parse(String(fileContent)) as ProjectSettingsDoc;
 
   const urlsToDelete = oldWorkingImages.flatMap((workingImage) =>
     workingImage.imageEntries
@@ -154,32 +180,33 @@ export async function loadSettings(oldWorkingImages, settingsUploadedByUser) {
       .map((imageEntry) => imageEntry.imageUrl)
   );
   urlsToDelete.forEach((url) => {
-    window.URL.revokeObjectURL(url); //take away the memory that is linked to urls (they are now empty pointers, just to have memory available for something else / 2 GB limit)
+    if (url) window.URL.revokeObjectURL(url); //take away the memory that is linked to urls (they are now empty pointers, just to have memory available for something else / 2 GB limit)
   });
 
   const workingImages = await Promise.all(
-    [parsedSettings.imageFixed, ...parsedSettings.workingImages].map(
-      async (workingImage) => ({
-        ...workingImage,
-        imageEntries: await Promise.all(
-          workingImage.imageEntries.map(async (imageEntry) => {
-            if (!imageEntry.base64) {
-              return {
-                ...imageEntry,
-              };
-            }
-            const image = await ImageJs.load(imageEntry.base64);
-            const url = await URL.createObjectURL(await image.toBlob());
+    [
+      ...(parsedSettings.imageFixed ? [parsedSettings.imageFixed] : []),
+      ...parsedSettings.workingImages,
+    ].map(async (workingImage) => ({
+      ...workingImage,
+      imageEntries: await Promise.all(
+        workingImage.imageEntries.map(async (imageEntry) => {
+          if (!imageEntry.base64) {
             return {
               ...imageEntry,
-              imageUrl: url, //image drawn in browser, by default this converts to png - 230828
-              thumbnailUrl: url, //image drawn in browser, by default this converts to png - 230828
-              galleryUrl: url, //image drawn in browser, by default this converts to png - 230828
             };
-          })
-        ),
-      })
-    )
+          }
+          const image = await ImageJs.load(imageEntry.base64);
+          const url = await URL.createObjectURL(await image.toBlob());
+          return {
+            ...imageEntry,
+            imageUrl: url, //image drawn in browser, by default this converts to png - 230828
+            thumbnailUrl: url, //image drawn in browser, by default this converts to png - 230828
+            galleryUrl: url, //image drawn in browser, by default this converts to png - 230828
+          };
+        })
+      ),
+    }))
   );
 
   return {
@@ -188,11 +215,14 @@ export async function loadSettings(oldWorkingImages, settingsUploadedByUser) {
   };
 }
 
-export async function uploadImage(projectId, file) {
+export async function uploadImage(
+  projectId: string,
+  file: File
+): Promise<UploadImageResponse> {
   const formData = new FormData();
   formData.append("image", file);
   return fetch(apiUrl(`/api/upload/${projectId}`), {
     method: "POST",
     body: formData,
-  }).then((x) => x.json());
+  }).then((x) => x.json() as Promise<UploadImageResponse>);
 }

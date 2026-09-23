@@ -19,29 +19,24 @@ tasksApi.post("/api/start/:id", async (request, response) => {
   response.json({ ...job, status });
 });
 
-tasksApi.get("/api/status", async (req, res) => {
+tasksApi.get("/api/status", async (_req, res) => {
   res.json(tasks);
 });
 
-tasksApi.get("/api/projects", async (req, res) => {
-  const files = await glob("./uploads/project-*/settings.json").then((paths) =>
-    Promise.all(
-      paths
-        .map((x) => "./" + x.replace(/\\/g, "/"))
-        .map(async (path) => {
-          const content = await fs.readFile(path, "utf8");
-          return JSON.parse(content);
-        })
-    )
+tasksApi.get("/api/projects", async (_req, res) => {
+  const paths = await glob("./uploads/project-*/settings.json");
+  const files = await Promise.all(
+    paths.map(async (path) => {
+      const content = await fs.readFile(path.replace(/\\/g, "/"), "utf8");
+      return JSON.parse(content);
+    })
   );
   res.json(files);
 });
 
 tasksApi.post("/api/delete/:id", async (req, res) => {
   const { id } = req.params;
-  if (processes[id]) {
-    processes[id].kill();
-  }
+  processes[id]?.kill();
   await rimraf(`uploads/${id}`).catch(console.log);
   delete tasks[id];
   res.json({});
@@ -49,16 +44,19 @@ tasksApi.post("/api/delete/:id", async (req, res) => {
 
 tasksApi.post("/api/stop/:id", async (req, res) => {
   const { id } = req.params;
-  processes[id].kill();
+  const task = tasks[id];
+  processes[id]?.kill();
   delete processes[id];
-  tasks[id].status = "stopped";
-  tasks[id].done = Date.now();
-  tasks[id].message = "stopped by user";
+  if (task) {
+    task.status = "stopped";
+    task.done = Date.now();
+    task.message = "stopped by user";
 
-  await fs.writeFile(
-    `uploads/${id}/task.json`,
-    JSON.stringify(tasks[id], null, 2)
-  );
+    await fs.writeFile(
+      `uploads/${id}/task.json`,
+      JSON.stringify(task, null, 2)
+    );
+  }
 
   res.json(tasks);
 });

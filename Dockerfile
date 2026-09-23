@@ -39,6 +39,6 @@ RUN yarn && yarn build
 VOLUME /app/results 
 
 WORKDIR /app/server
-RUN yarn
+RUN yarn && yarn build
 
-CMD ["/bin/bash", "--login", "-c", "node index.js"]
+CMD ["/bin/bash", "--login", "-c", "node dist/index.js"]

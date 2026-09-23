@@ -28,3 +28,5 @@ yarn-error.log*
 results
 
 /scripts_registration/__pycache__
+# compiled server output
+/server/dist

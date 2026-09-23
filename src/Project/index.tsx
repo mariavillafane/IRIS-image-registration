@@ -36,8 +36,13 @@ import Dropzone, { useDropzone } from "react-dropzone";
 import { useJobQueue } from "../utils/hooks";
 import { uploadImage } from "../utils/actions";
 import { apiUrl } from "../utils/api";
+import type { ProjectSettingsDoc, Task, TransformationJson } from "../types";
 
-function ProjectCard({ refresh, ...p }) {
+interface ProjectCardProps extends ProjectSettingsDoc {
+  refresh: () => void;
+}
+
+function ProjectCard({ refresh, ...p }: ProjectCardProps) {
   const navigate = useNavigate();
   return (
     <Card
@@ -63,7 +68,7 @@ function ProjectCard({ refresh, ...p }) {
         <Tooltip title="last modified">
           <Chip
             avatar={<ScheduleIcon />}
-            label={new Date(p.uploaded).toUTCString()}
+            label={new Date(p.uploaded ?? 0).toUTCString()}
           />
         </Tooltip>
         <Tooltip title="images">
@@ -105,7 +110,7 @@ function ProjectCard({ refresh, ...p }) {
         ariaLabel="SpeedDial basic example"
         direction="left"
         sx={{ position: "absolute", bottom: 16, right: 16 }}
-        icon={<SpeedDialIcon fontSize="small" />}
+        icon={<SpeedDialIcon />}
       >
         <SpeedDialAction
           onClick={() => navigate(`/${p.id}`)}
@@ -114,7 +119,7 @@ function ProjectCard({ refresh, ...p }) {
         />
 
         <SpeedDialAction
-          onClick={() => window.open(p.thumbnail, "_blank")}
+          onClick={() => p.thumbnail && window.open(p.thumbnail, "_blank")}
           icon={<CameraIcon color="info" />}
           tooltipTitle={"Download Preview"}
         />
@@ -141,26 +146,32 @@ function ProjectCard({ refresh, ...p }) {
   );
 }
 
-function TransformationData({ id, transformation }) {
-  const [data, setData] = useState({});
+function TransformationData({
+  id,
+  transformation,
+}: {
+  id: string;
+  transformation: string;
+}) {
+  const [data, setData] = useState<TransformationJson>({});
   const [open, setOpen] = useState(false);
   useEffect(() => {
     fetch(transformation, {
       method: "GET", // *GET, POST, PUT, DELETE, etc.
       mode: "cors", // no-cors, *cors, same-origin
     })
-      .then((x) => x.json())
+      .then((x) => x.json() as Promise<TransformationJson>)
       .then((data) => setData(data));
   }, [transformation]);
 
   return (
     <Box display="flex" justifyContent={"space-between"} alignItems={"center"}>
-      <h2>{transformation.split("/").at(-1).replace(".json", "")} </h2>
+      <h2>{transformation.split("/").at(-1)?.replace(".json", "")} </h2>
       <Box>
         <Chip label={`tx: ${data?.transformation_obtained_s3?.tx}`} />
         <Chip label={`ty: ${data?.transformation_obtained_s3?.ty}`} />
         <Chip
-          label={`mi: ${data?.transformation_obtained_s4?.mi_average.toFixed(
+          label={`mi: ${data?.transformation_obtained_s4?.mi_average?.toFixed(
             3
           )}`}
         />
@@ -206,8 +217,8 @@ function TransformationData({ id, transformation }) {
   );
 }
 
-function Results({ id, files }) {
-  const transformed = files
+function Results({ id, files }: { id: string; files: string[] }) {
+  const transformed = (files ?? [])
     .filter((image) => image.endsWith("transformations.json"))
     .map((t) => {
       const prefix = t.replace("_transformations.json", "");
@@ -223,7 +234,7 @@ function Results({ id, files }) {
     <>
       {transformed.map((t) => (
         <Box key={t.transformation}>
-          <TransformationData id={id} {...t} />
+          <TransformationData id={id} transformation={t.transformation} />
           <Box display="flex" flexWrap="wrap" gap={2}>
             {t.images
               .filter((image) => !image.includes("fixed_image"))
@@ -261,15 +272,15 @@ function Results({ id, files }) {
   );
 }
 
-export function JobResults(job) {
-  const [results, setResults] = useState([]);
+export function JobResults(job: Task) {
+  const [results, setResults] = useState<string[]>([]);
 
   useEffect(() => {
     fetch(apiUrl(`/api/results/${job.id}`), {
       method: "GET", // *GET, POST, PUT, DELETE, etc.
       mode: "cors", // no-cors, *cors, same-origin
     })
-      .then((x) => x.json())
+      .then((x) => x.json() as Promise<string[]>)
       .then(setResults);
   }, [job.id]);
 
@@ -280,7 +291,7 @@ export function JobResults(job) {
   );
 }
 
-export function JobDetails(job) {
+export function JobDetails(job: Task) {
   if (job.status === "error") {
     return (
       <pre>
@@ -294,17 +305,18 @@ export function JobDetails(job) {
 export default function ProjectView() {
   const [time, setTime] = useState(0);
   const refresh = () => setTime(Date.now());
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<ProjectSettingsDoc[]>([]);
 
   const { jobs } = useJobQueue();
   useEffect(() => {
     fetch(apiUrl("/api/projects"))
-      .then((x) => x.json())
-      .then((x) => x.sort((a, b) => b.uploaded - a.uploaded))
+      .then((x) => x.json() as Promise<ProjectSettingsDoc[]>)
+      .then((x) => x.sort((a, b) => (b.uploaded ?? 0) - (a.uploaded ?? 0)))
       .then(setProjects);
   }, [time]);
 
-  const onDrop = useCallback((files) => {
+  const onDrop = useCallback((files: File[]) => {
+    if (!files.length) return;
     const data = new FormData();
     data.append("project", files[0]);
 
@@ -397,10 +409,7 @@ export default function ProjectView() {
           {Object.values(jobs)
             .sort((a, b) => b.updated - a.updated)
             .map((x) => (
-              <Accordion
-                key={x.id}
-                slotProps={{ transition: { unmountOnExit: true } }}
-              >
+              <Accordion key={x.id}>
                 <AccordionSummary>
                   <Box
                     width="100%"
@@ -443,10 +452,9 @@ export default function ProjectView() {
                             <LinearProgress
                               color={
                                 ["success", "error"].includes(x.status)
-                                  ? x.status
+                                  ? (x.status as "success" | "error")
                                   : "primary"
                               }
-                              label={`${x.progress[0]} / ${x.progress[1]}`}
                               variant={
                                 +x.progress[1] ? "determinate" : "indeterminate"
                               }

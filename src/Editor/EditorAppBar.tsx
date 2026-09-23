@@ -22,6 +22,30 @@ import AppsIcon from "@mui/icons-material/Apps";
 import { Link } from "react-router";
 import { downloadCanvas, runRegistration } from "../utils/actions";
 import { JobQueueViewer } from "./JobViewer";
+import type {
+  EditorAction,
+  EditorSettings,
+  HistoryMeta,
+  HistoryState,
+  StackField,
+  WorkingImage,
+} from "../types";
+import type { Dispatch, SetStateAction } from "react";
+
+interface EditorAppBarProps {
+  state: HistoryState<EditorSettings>;
+  dispatch: Dispatch<EditorAction>;
+  settingsJson: EditorSettings;
+  editorMode: string;
+  setEditorMode: (mode: string) => void;
+  stacks: WorkingImage[];
+  zoomPower: string | number;
+  setZoomPower: (value: string | number) => void;
+  inProgress: boolean;
+  setInProgress: Dispatch<SetStateAction<boolean>>;
+  selectedStackId: number;
+  onUndoRedo: (snack: { message: string }) => void;
+}
 
 export function EditorAppBar({
   state,
@@ -36,19 +60,25 @@ export function EditorAppBar({
   setInProgress,
   selectedStackId,
   onUndoRedo,
-}) {
+}: EditorAppBarProps) {
   const imageMoving = stacks.find((stack) => selectedStackId === stack.id);
 
-  const getInputProps = (label, field, defaultValue = 0) => ({
-    style: { width: "11ex" },
-    size: "small",
-    margin: "normal",
+  const getInputProps = (
+    label: string,
+    field: StackField,
+    defaultValue = 0
+  ) => ({
+    style: { width: "11ex" } as React.CSSProperties,
+    size: "small" as const,
+    margin: "normal" as const,
     type: "number",
-    color: "secondary",
+    color: "secondary" as const,
     label,
     defaultValue,
     value: imageMoving?.[field] || defaultValue,
-    onChange: (event) => {
+    onChange: (
+      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => {
       if (imageMoving) {
         dispatch({
           type: "UPDATE_STACK",
@@ -63,22 +93,22 @@ export function EditorAppBar({
 
   const handleUndo = () => {
     if (state.past.length <= 1) return;
-    const meta = state.presentMeta;
+    const meta: HistoryMeta | undefined = state.presentMeta;
     dispatch({ type: "UNDO" });
     onUndoRedo({
       message: `Undid ${meta?.label || meta?.type} @ ${new Date(
-        meta?.time
+        meta?.time ?? NaN
       ).toLocaleTimeString()}`,
     });
   };
 
   const handleRedo = () => {
     if (state.future.length === 0) return;
-    const meta = state.futureMeta[0];
+    const meta: HistoryMeta | undefined = state.futureMeta[0];
     dispatch({ type: "REDO" });
     onUndoRedo({
       message: `Redid ${meta?.label || meta?.type} @ ${new Date(
-        meta?.time
+        meta?.time ?? NaN
       ).toLocaleTimeString()}`,
     });
   };
@@ -175,7 +205,6 @@ export function EditorAppBar({
               onChange={(e) => setZoomPower(e.target.value)}
               inputProps={{ maxLength: 6, step: 0.1, max: 1, min: 0 }}
               size="small"
-              fontSize="5"
               margin="normal"
               type="number"
               color="secondary"

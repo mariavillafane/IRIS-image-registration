@@ -6,7 +6,7 @@ Our method was initially developed for registering element distribution maps res
 
 The purpose of developing IRIS is to simplify the use of this area-based registration method (described in Chapter 3 of Maria Eugenia Villafane's PhD Thesis) by making the functionality accessible to the user through the browser (thus removing the need for the user to interface with the code directly), as well as to facilitate the process of setting up the initial locations of multiple image stacks relative to a target fixed image in a streamlined workflow. Thus, developing IRIS as a browser-based application allows any user to perform a registration, without prior training in coding or image processing techniques.
 
-This research was funded by the [AHRC UKRI - Arts and Humanities Research Council](https://www.ukri.org/councils/ahrc/) - Grant no. AH/T002417/1, and it forms part of the agenda of the [ARTICT group](https://art-ict.github.io/artict/home.html). 
+This research was funded by the [AHRC UKRI - Arts and Humanities Research Council](https://www.ukri.org/councils/ahrc/) - Grant no. AH/T002417/1, and it forms part of the agenda of the [ARTICT group](https://art-ict.github.io/artict/home.html).
 
 IRIS is licensed as an Open Source Software, under the GNU Affero General Public License v3.0 - please refer to the [license](https://github.com/mariavillafane/IRIS-image-registration/blob/main/LICENSE) for full details.
 
@@ -38,4 +38,13 @@ docker run -p4000:4000 -it mariavillafane/iris:latest
 docker pull mariavillafane/iris:latest
 ```
 
-These steps are all shown in this short tutorial video: [IRIS 101: Installation - Run Docker Image](https://www.youtube.com/watch?v=ha4nMlK6wcY). 
+These steps are all shown in this short tutorial video: [IRIS 101: Installation - Run Docker Image](https://www.youtube.com/watch?v=ha4nMlK6wcY).
+
+# Development
+
+The frontend (React) and the backend (Express) are both written in TypeScript.
+
+- Frontend dev server: `yarn start` (CRA dev server on port 3000, proxies `/api` to the backend)
+- Backend dev server: `cd server && yarn dev` (tsx watch, port 4000)
+- Production builds: `yarn build` (client -> `build/`), and `cd server && yarn build` (server -> `server/dist/`, run with `yarn start`)
+- Tests: `CI=true yarn test --watchAll=false`

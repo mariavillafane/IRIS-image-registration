@@ -8,47 +8,62 @@ import prettyBytes from "pretty-bytes";
 import unzipper from "unzipper";
 import { rimraf } from "rimraf";
 
+import type { UploadedImageMetadata } from "../types.js";
+
 const upload = multer({ dest: "tmp/" });
 export const importApi = express.Router();
 
-function stripMetadataBuffers(data) {
+interface SaveSettingsBody {
+  thumbnail: string;
+  [key: string]: unknown;
+}
+
+function stripMetadataBuffers(data: sharp.Metadata): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(data).filter(([_k, v]) => !Buffer.isBuffer(v))
   );
 }
 
 importApi.post("/api/upload/:id", upload.single("image"), async (req, res) => {
-  const dest = "uploads/" + req.params.id + "/images/" + req.file.filename;
+  if (!req.file) {
+    res.status(400).json({ error: "No image file provided" });
+    return;
+  }
+  const file = req.file;
+
+  const dest = "uploads/" + req.params.id + "/images/" + file.filename;
   await mkdirp(dest);
-  const filePath = (dest + "/" + req.file.originalname).replace(/\\/g, "/");
+  const filePath = (dest + "/" + file.originalname).replace(/\\/g, "/");
   const filePathNoExt = filePath.replace(/\.[^/.]+$/, "");
-  await fs.rename(req.file.path, filePath);
+  await fs.rename(file.path, filePath);
   const image = sharp(filePath);
 
   const [metadata] = await Promise.all([
     image
       .metadata()
       .then(stripMetadataBuffers)
-      .then((x) => ({
-        ...x,
-        files: {
-          url: "/api/" + filePath,
-          path: filePath,
-          webUrl: "/api/" + filePathNoExt + ".web.png",
-          smallUrl: "/api/" + filePathNoExt + ".128.png",
-          mediumUrl: "/api/" + filePathNoExt + ".512.png",
-        },
-        destination: dest,
-        size: req.file.size,
-        uploaded: Date.now(),
-        sizeStr: prettyBytes(req.file.size),
-      })),
+      .then(
+        (x): UploadedImageMetadata => ({
+          ...x,
+          files: {
+            url: "/api/" + filePath,
+            path: filePath,
+            webUrl: "/api/" + filePathNoExt + ".web.png",
+            smallUrl: "/api/" + filePathNoExt + ".128.png",
+            mediumUrl: "/api/" + filePathNoExt + ".512.png",
+          },
+          destination: dest,
+          size: file.size,
+          uploaded: Date.now(),
+          sizeStr: prettyBytes(file.size),
+        })
+      ),
     image.toFile(filePathNoExt + ".web.png"),
     image
-      .resize(128, 128, { resize: "contain" })
+      .resize(128, 128, { fit: "contain" })
       .toFile(filePathNoExt + ".128.png"),
     image
-      .resize(512, 512, { resize: "contain" })
+      .resize(512, 512, { fit: "contain" })
       .toFile(filePathNoExt + ".512.png"),
   ]);
 
@@ -67,10 +82,16 @@ importApi.delete("/api/uploads/:pid/images/:id", async (req, res) => {
 });
 
 importApi.post("/api/save/:id", async (req, res) => {
+  const body = req.body as SaveSettingsBody | undefined;
+  if (!body?.thumbnail) {
+    res.status(400).json({ error: "Missing thumbnail in request body" });
+    return;
+  }
+
   const dest = "uploads/" + req.params.id + "/";
   await mkdirp(dest);
-  const isInlineThumbnail = req.body.thumbnail.startsWith("data:image");
-  const thumbnail = req.body.thumbnail.replace(/^data:image\/png;base64,/, "");
+  const isInlineThumbnail = body.thumbnail.startsWith("data:image");
+  const thumbnail = body.thumbnail.replace(/^data:image\/png;base64,/, "");
   await Promise.all([
     isInlineThumbnail
       ? fs.writeFile(dest + "thumbnail.png", thumbnail, "base64")
@@ -79,7 +100,7 @@ importApi.post("/api/save/:id", async (req, res) => {
       dest + "settings.json",
       JSON.stringify(
         {
-          ...req.body,
+          ...body,
           dest,
           uploaded: Date.now(),
           id: req.params.id,
@@ -95,9 +116,15 @@ importApi.post("/api/save/:id", async (req, res) => {
 });
 
 importApi.post("/api/import", upload.single("project"), async (req, res) => {
-  await unzipper.Open.file(req.file.path)
+  if (!req.file) {
+    res.status(400).json({ error: "No project file provided" });
+    return;
+  }
+  const file = req.file;
+
+  await unzipper.Open.file(file.path)
     .then((x) => x.extract({ path: "uploads" })) //path: __dirname + "/uploads"
-    .then(() => rimraf(req.file.path))
+    .then(() => rimraf(file.path))
     .catch((e) => {
       console.error(e);
     });

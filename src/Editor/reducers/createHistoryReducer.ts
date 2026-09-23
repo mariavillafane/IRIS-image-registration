@@ -1,22 +1,29 @@
-const createHistoryReducer = (
-  baseReducer,
-  ignoreEvents = [
+import type { HistoryMeta, HistoryState } from "../../types";
+
+const createHistoryReducer = <
+  S,
+  A extends { type: string; meta?: HistoryMeta }
+>(
+  baseReducer: (state: S, action: A) => S,
+  ignoreEvents: string[] = [
     "CANVAS_DRAG_MOVE",
     //"CANVAS_DRAG_START",
     "CANVAS_UPDATE_MOUSEPOS",
   ]
 ) => {
-  return (state, action) => {
+  return (state: HistoryState<S>, action: A): HistoryState<S> => {
     console.log("History Reducer - Action:", action.type);
     console.log("History Reducer - Past length:", state.past.length);
     console.log("History Reducer - Future length:", state.future.length);
 
-    const buildMeta = (act) =>
-      act.meta || {
+    const buildMeta = (act: A): HistoryMeta => {
+      if (act.meta) return act.meta;
+      return {
         type: act.type,
         time: Date.now(),
-        label: (act.meta && act.meta.label) || act.type,
+        label: act.type,
       };
+    };
 
     // UNDO
     if (action.type === "UNDO") {
@@ -67,7 +74,7 @@ const createHistoryReducer = (
     console.log("Base reducer returned new state");
 
     // Simple deep-equality test (JSON stringify - sufficient for this state shape)
-    const isEqual = (a, b) => {
+    const isEqual = (a: S, b: S): boolean => {
       try {
         return JSON.stringify(a) === JSON.stringify(b);
       } catch (e) {

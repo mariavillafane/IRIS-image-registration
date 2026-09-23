@@ -1,8 +1,27 @@
 import { useState, useRef } from "react";
+import type { Dispatch } from "react";
 import { Box } from "@mui/system";
 import { ReactSVGPanZoom, INITIAL_VALUE, TOOL_PAN } from "react-svg-pan-zoom";
+import type { ReactSVGPanZoom as ReactSVGPanZoomInstance } from "react-svg-pan-zoom";
+import type { Tool, Value } from "react-svg-pan-zoom";
+import type { DragStart, EditorAction, Point, WorkingImage } from "../types";
 
-const CanvasImage = (props) => {
+interface CanvasImageProps {
+  i: number;
+  stackId: number;
+  entryId: string;
+  x?: number;
+  y?: number;
+  opacity?: number;
+  imageUrl?: string;
+  width?: number;
+  height?: number;
+  scaling?: number;
+  rotation?: number;
+  clipPath?: string;
+}
+
+const CanvasImage = (props: CanvasImageProps) => {
   const [retry, setRetry] = useState(0);
   return (
     <image
@@ -21,16 +40,30 @@ const CanvasImage = (props) => {
       x={props.x}
       y={props.y}
       opacity={props.opacity}
-      href={props.imageUrl + `${retry ? "?" + retry : ""}`}
-      width={props.width * props.scaling}
-      height={props.height * props.scaling}
+      href={`${props.imageUrl ?? ""}${retry ? "?" + retry : ""}`}
+      width={
+        props.width !== undefined ? props.width * props.scaling! : undefined
+      }
+      height={
+        props.height !== undefined ? props.height * props.scaling! : undefined
+      }
       transform={`rotate(${props.rotation},${props.x},${props.y})`}
       clipPath={props.clipPath}
     />
   );
 };
 
-const ComparisonClipPathRectangle = ({ orientation, mousepos, w, h }) => {
+const ComparisonClipPathRectangle = ({
+  orientation,
+  mousepos,
+  w,
+  h,
+}: {
+  orientation: number;
+  mousepos: Point;
+  w: number;
+  h: number;
+}) => {
   switch (orientation % 8) {
     case 0:
       return <rect x={mousepos.x} y={0} width={w} height={h} />;
@@ -67,12 +100,25 @@ const ComparisonClipPathRectangle = ({ orientation, mousepos, w, h }) => {
   }
 };
 
-export function RegistrationCanvas(props) {
-  const ref = useRef();
-  const Viewer = useRef(null);
-  const [tool, onChangeTool] = useState(TOOL_PAN);
-  const [value, onChangeValue] = useState(INITIAL_VALUE);
-  const [dragStart, setDragStart] = useState(null);
+interface RegistrationCanvasProps {
+  selectedStackId: number | null;
+  setSelectedStackId: (id: number) => void;
+  dispatch: Dispatch<EditorAction>;
+  dragStart: DragStart | null;
+  mousepos: Point;
+  orientation: number;
+  stacks: WorkingImage[];
+  worldScale: number;
+  zoomPower: string | number;
+  editorMode: string;
+}
+
+export function RegistrationCanvas(props: RegistrationCanvasProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const Viewer = useRef<ReactSVGPanZoomInstance>(null);
+  const [tool, onChangeTool] = useState<Tool>(TOOL_PAN);
+  const [value, onChangeValue] = useState<Value | null>(INITIAL_VALUE);
+  const [dragStart, setDragStart] = useState<DragStart | null>(null);
 
   const w = (props.stacks?.[0]?.x || 0) + (props.stacks?.[0]?.width || 0);
   const h = (props.stacks?.[0]?.y || 0) + (props.stacks?.[0]?.height || 0);
@@ -87,7 +133,7 @@ export function RegistrationCanvas(props) {
       }} //in case mouse is released outside of canvas}
       ref={ref}
       width="100%"
-      grow={1}
+      flexGrow={1}
       display="flex"
       flexDirection="column"
       justifyContent={"stretch"}
@@ -110,9 +156,12 @@ export function RegistrationCanvas(props) {
             props.dispatch({ type: "CANVAS_CYCLE_ORIENTATION" });
             return;
           }
-          if (e.originalEvent?.target?.dataset?.stackId === undefined) return;
-          const stackIndex = +e.originalEvent.target.dataset.stackIndex;
-          const stackId = +e.originalEvent.target.dataset.stackId;
+          const target = e.originalEvent.target as
+            | (Element & { dataset: DOMStringMap })
+            | null;
+          if (target?.dataset.stackId === undefined) return;
+          const stackIndex = +(target.dataset.stackIndex ?? NaN);
+          const stackId = +(target.dataset.stackId ?? NaN);
           const stack = props.stacks[stackIndex];
           const svgScaleX = e.value.a;
           const svgScaleY = e.value.d;

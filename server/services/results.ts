@@ -1,6 +1,7 @@
 import { glob } from "glob";
 import { Router } from "express";
 import archiver from "archiver";
+import * as fs from "fs/promises";
 
 export const resultsApi = Router();
 
@@ -18,9 +19,16 @@ resultsApi.get("/api/results/:id", async (req, res) => {
   res.json(finallist);
 });
 
-resultsApi.get("/api/images", async (req, res) => {
-  const files = await glob("./uploads/*/*.json").then((paths) =>
-    paths.map((x) => require("./" + x.replace(/\\/g, "/")))
+resultsApi.get("/api/images", async (_req, res) => {
+  // NOTE: this endpoint used to `require()` each JSON file, which is not
+  // available in an ESM package - it crashed whenever any project existed.
+  // The files are read and parsed explicitly instead.
+  const paths = await glob("./uploads/*/*.json");
+  const files = await Promise.all(
+    paths.map(async (path) => {
+      const content = await fs.readFile(path.replace(/\\/g, "/"), "utf8");
+      return JSON.parse(content);
+    })
   );
   res.json(files);
 });

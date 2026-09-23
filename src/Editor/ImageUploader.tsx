@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import VisibilitySharpIcon from "@mui/icons-material/VisibilitySharp";
 import VisibilityOffSharpIcon from "@mui/icons-material/VisibilityOffSharp";
 import { useState } from "react";
+import type { Dispatch } from "react";
 import ClearIcon from "@mui/icons-material/Clear";
 import {
   Alert,
@@ -22,14 +23,15 @@ import ReplayIcon from "@mui/icons-material/Replay"; //rotation
 import LocationOnIcon from "@mui/icons-material/LocationOn"; //position
 import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge"; //scaling
 import { uploadImage } from "../utils/actions";
+import type { EditorAction, ImageEntry, WorkingImage } from "../types";
 
-function computeNextId(stacks) {
+function computeNextId(stacks: WorkingImage[]): number {
   return stacks.map((x) => x.id + 1).reduce((a, b) => (a > b ? a : b), 0);
 }
 
 let counter = 0;
 
-function makefilename(file, stackId) {
+function makefilename(file: File, stackId: number): string {
   const filename = file.name.split(".");
   console.log(filename);
   const filename_ok = filename.slice(0, -1);
@@ -38,6 +40,22 @@ function makefilename(file, stackId) {
     -1
   )}`; //here putting again the extension with . (ie .jpg)
   return filename_ok_joined_ok;
+}
+
+interface StackUploaderProps {
+  stack: WorkingImage;
+  index: number;
+  selectedStackId: number;
+  setSelectedStackId: (id: number) => void;
+  dispatch: Dispatch<EditorAction>;
+  stacks: WorkingImage[];
+  small: boolean;
+  onDropImageToStack: (
+    stack: WorkingImage,
+    index: number,
+    acceptedFiles: File[],
+    allowMultiple?: number | boolean
+  ) => Promise<void>;
 }
 
 function StackUploader({
@@ -49,7 +67,7 @@ function StackUploader({
   stacks,
   small,
   onDropImageToStack,
-}) {
+}: StackUploaderProps) {
   return (
     <Paper
       // key={index}
@@ -120,13 +138,14 @@ function StackUploader({
                       )
                         return;
 
-                      const basePath = imageEntry.files.url
+                      const basePath = imageEntry.files?.url
                         .split("/")
                         .slice(0, -1)
                         .join("/");
-                      fetch(basePath, { method: "delete" }).catch(
-                        console.error
-                      );
+                      if (basePath)
+                        fetch(basePath, { method: "delete" }).catch(
+                          console.error
+                        );
 
                       dispatch({
                         type: "DELETE_IMAGE_ENTRY",
@@ -209,14 +228,25 @@ function StackUploader({
             icon={<PhotoSizeSelectLargeIcon />}
             size="small"
             variant="outlined"
-            label={`${Math.round(stack.width * stack.scaling)}x${Math.round(
-              stack.height * stack.scaling
-            )} @ ${stack.scaling}`}
+            label={`${Math.round(
+              (stack.width ?? 0) * (stack.scaling ?? 1)
+            )}x${Math.round((stack.height ?? 0) * (stack.scaling ?? 1))} @ ${
+              stack.scaling
+            }`}
           />
         </Tooltip>
       </Box>
     </Paper>
   );
+}
+
+interface ImageUploaderProps {
+  projectId: string;
+  stacks: WorkingImage[];
+  dispatch: Dispatch<EditorAction>;
+  selectedStackId: number;
+  setSelectedStackId: (id: number) => void;
+  small?: boolean;
 }
 
 export function ImageUploader({
@@ -226,11 +256,11 @@ export function ImageUploader({
   selectedStackId,
   setSelectedStackId,
   small = false,
-}) {
-  const [uploads, setUploads] = useState([0, 0]);
-  async function onDrop2(acceptedFiles) {
+}: ImageUploaderProps) {
+  const [uploads, setUploads] = useState<[number, number]>([0, 0]);
+  async function onDrop2(acceptedFiles: File[]): Promise<void> {
     const stackId = computeNextId(stacks);
-    const imageEntries = await Promise.all(
+    const imageEntries: ImageEntry[] = await Promise.all(
       acceptedFiles.map(async (file, i, all) => {
         setUploads([i, all.length]);
         console.log("uploading", file.name);
@@ -242,7 +272,7 @@ export function ImageUploader({
         return {
           stackId,
           id: makefilename(file, stackId),
-          ...data.metadata,
+          ...(data.metadata as Omit<ImageEntry, "id">),
           file: {
             name: file.name,
             lastModified: file.lastModified,
@@ -264,7 +294,7 @@ export function ImageUploader({
       );
     }
 
-    const stack = {
+    const stack: WorkingImage = {
       x: 0,
       y: 0,
       opacity: 1,
@@ -283,12 +313,12 @@ export function ImageUploader({
   }
 
   async function onDropImageToStack(
-    stack,
-    index,
-    acceptedFiles,
-    allowMultiple = true
-  ) {
-    const imageEntries = await Promise.all(
+    stack: WorkingImage,
+    index: number,
+    acceptedFiles: File[],
+    allowMultiple: number | boolean = true
+  ): Promise<void> {
+    const imageEntries: ImageEntry[] = await Promise.all(
       (allowMultiple ? acceptedFiles : acceptedFiles.slice(0, 1)).map(
         async (file, i, all) => {
           setUploads([i, all.length]);
@@ -297,7 +327,7 @@ export function ImageUploader({
           return {
             stackId: stack.id,
             id: makefilename(file, stack.id), //`${stack.id}-${filename_ok_joined}_${counter++}.${filename.at(-1)}`,
-            ...data.metadata,
+            ...(data.metadata as Omit<ImageEntry, "id">),
             path: data.path,
             //base64: await readImageAsBase64(file),
             imageUrl: data.webUrl, //await URL.createObjectURL(await image.toBlob()), //image drawn in browser, by defult this converts to png - 230828
@@ -324,7 +354,12 @@ export function ImageUploader({
     } else {
       dispatch({
         type: "REPLACE_STACK_IMAGES",
-        payload: { stackIndex: index, width, height, imageEntries },
+        payload: {
+          stackIndex: index,
+          width: width ?? 0,
+          height: height ?? 0,
+          imageEntries,
+        },
       });
     }
   }
@@ -364,9 +399,11 @@ export function ImageUploader({
             <div {...getRootProps()}>
               <input {...getInputProps()} />
               <Typography
-                sx={{ fontSize: 14 }}
-                color="text.secondary"
-                backgroundColor="#eeeeee"
+                sx={{
+                  fontSize: 14,
+                  color: "text.secondary",
+                  backgroundColor: "#eeeeee",
+                }}
                 gutterBottom
               >
                 Upload Fixed Image (only one image, used for comparison or as
@@ -407,9 +444,11 @@ export function ImageUploader({
               <input {...getInputProps()} />
 
               <Typography
-                sx={{ fontSize: 14 }}
-                color="text.secondary"
-                backgroundColor="#eeeeee"
+                sx={{
+                  fontSize: 14,
+                  color: "text.secondary",
+                  backgroundColor: "#eeeeee",
+                }}
                 gutterBottom
               >
                 Upload Moving Images (you can upload multiple images, they will

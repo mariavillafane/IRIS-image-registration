@@ -1,6 +1,12 @@
 import settingsReducer from "../reducers/settingsReducer";
+import type {
+  DragStart,
+  EditorAction,
+  EditorSettings,
+  WorkingImage,
+} from "../../types";
 
-const mockState = {
+const mockState: EditorSettings = {
   id: "proj-1",
   loading: false,
   title: "Test Project",
@@ -16,7 +22,17 @@ const mockState = {
       rotation: 0,
       opacity: 1,
       imageEntries: [
-        { id: "img-1", checked: true, files: { url: "/img1.jpg" } },
+        {
+          id: "img-1",
+          checked: true,
+          files: {
+            url: "/img1.jpg",
+            path: "/img1.jpg",
+            webUrl: "/img1.jpg",
+            smallUrl: "/img1.jpg",
+            mediumUrl: "/img1.jpg",
+          },
+        },
       ],
     },
     {
@@ -29,7 +45,17 @@ const mockState = {
       rotation: 0,
       opacity: 1,
       imageEntries: [
-        { id: "img-2", checked: true, files: { url: "/img2.jpg" } },
+        {
+          id: "img-2",
+          checked: true,
+          files: {
+            url: "/img2.jpg",
+            path: "/img2.jpg",
+            webUrl: "/img2.jpg",
+            smallUrl: "/img2.jpg",
+            mediumUrl: "/img2.jpg",
+          },
+        },
       ],
     },
   ],
@@ -38,11 +64,17 @@ const mockState = {
   orientation: 0,
 };
 
+/** Cast used for actions that are outside the typed EditorAction union. */
+const asAction = (action: unknown): EditorAction => action as EditorAction;
+
 describe("settingsReducer", () => {
   test("SET_SETTINGS replaces entire state", () => {
     const initial = { loading: true };
     const payload = { loading: false, title: "New" };
-    const out = settingsReducer(initial, { type: "SET_SETTINGS", payload });
+    const out = settingsReducer(initial as EditorSettings, {
+      type: "SET_SETTINGS",
+      payload: payload as unknown as EditorSettings,
+    });
     expect(out).toEqual(payload);
   });
 
@@ -56,7 +88,9 @@ describe("settingsReducer", () => {
   });
 
   test("SET_STACKS replaces workingImages", () => {
-    const newStacks = [{ id: 99, imageEntries: [] }];
+    const newStacks = [
+      { id: 99, imageEntries: [] },
+    ] as unknown as WorkingImage[];
     const out = settingsReducer(mockState, {
       type: "SET_STACKS",
       payload: newStacks,
@@ -77,8 +111,8 @@ describe("settingsReducer", () => {
       type: "UPDATE_STACK",
       payload: { stackId: 2, updates: { x: 100 } },
     });
-    expect(out.workingImages.find((s) => s.id === 2).x).toBe(100);
-    expect(out.workingImages.find((s) => s.id === 1).x).toBe(0);
+    expect(out.workingImages.find((s) => s.id === 2)?.x).toBe(100);
+    expect(out.workingImages.find((s) => s.id === 1)?.x).toBe(0);
   });
 
   test("UPDATE_STACK_BY_INDEX updates stack at index", () => {
@@ -90,29 +124,21 @@ describe("settingsReducer", () => {
     expect(out.workingImages[1].y).toBe(50);
   });
 
-  test("CANVAS_DRAG_START sets dragStart", () => {
-    const out = settingsReducer(mockState, {
-      type: "CANVAS_DRAG_START",
-      payload: {
-        stackIndex: 0,
-        stackId: 1,
-        clientX: 100,
-        clientY: 200,
-        svgScaleX: 2,
-        svgScaleY: 2,
-      },
-    });
-    expect(out.dragStart).toEqual([50, 100, 0, 0, 0]);
+  test("CANVAS_DRAG_START is not handled by settingsReducer (drag start is kept locally in RegistrationCanvas)", () => {
+    const out = settingsReducer(mockState, { type: "CANVAS_DRAG_START" });
+    expect(out).toEqual(mockState);
   });
 
   test("CANVAS_DRAG_MOVE updates position when dragging", () => {
-    const stateWithDrag = {
-      ...mockState,
-      dragStart: [10, 20, 0, 0, 0],
-    };
-    const out = settingsReducer(stateWithDrag, {
+    const out = settingsReducer(mockState, {
       type: "CANVAS_DRAG_MOVE",
-      payload: { clientX: 50, clientY: 100, svgScaleX: 1, svgScaleY: 1 },
+      payload: {
+        clientX: 50,
+        clientY: 100,
+        svgScaleX: 1,
+        svgScaleY: 1,
+        dragStart: [10, 20, 0, 0, 0],
+      },
     });
     expect(out.workingImages[0].x).toBe(40);
     expect(out.workingImages[0].y).toBe(80);
@@ -126,13 +152,13 @@ describe("settingsReducer", () => {
     expect(out).toEqual(mockState);
   });
 
-  test("CANVAS_DRAG_END clears dragStart", () => {
-    const stateWithDrag = {
+  test("CANVAS_DRAG_END is not handled by settingsReducer (drag state is local to RegistrationCanvas)", () => {
+    const stateWithDrag: EditorSettings = {
       ...mockState,
-      dragStart: [10, 20, 0, 0, 0],
+      dragStart: [10, 20, 0, 0, 0] as DragStart,
     };
     const out = settingsReducer(stateWithDrag, { type: "CANVAS_DRAG_END" });
-    expect(out.dragStart).toBeNull();
+    expect(out.dragStart).toEqual([10, 20, 0, 0, 0]);
   });
 
   test("CANVAS_UPDATE_MOUSEPOS updates mousepos", () => {
@@ -151,7 +177,7 @@ describe("settingsReducer", () => {
   });
 
   test("ADD_STACK appends new stack", () => {
-    const newStack = { id: 3, imageEntries: [] };
+    const newStack = { id: 3, imageEntries: [] } as unknown as WorkingImage;
     const out = settingsReducer(mockState, {
       type: "ADD_STACK",
       payload: newStack,
@@ -187,14 +213,34 @@ describe("settingsReducer", () => {
   });
 
   test("DELETE_IMAGE_ENTRY removes image from stack", () => {
-    const stateWithMultipleEntries = {
+    const stateWithMultipleEntries: EditorSettings = {
       ...mockState,
       workingImages: [
         {
           ...mockState.workingImages[0],
           imageEntries: [
-            { id: "img-1", checked: true, files: { url: "/img1.jpg" } },
-            { id: "img-1b", checked: true, files: { url: "/img1b.jpg" } },
+            {
+              id: "img-1",
+              checked: true,
+              files: {
+                url: "/img1.jpg",
+                path: "/img1.jpg",
+                webUrl: "/img1.jpg",
+                smallUrl: "/img1.jpg",
+                mediumUrl: "/img1.jpg",
+              },
+            },
+            {
+              id: "img-1b",
+              checked: true,
+              files: {
+                url: "/img1b.jpg",
+                path: "/img1b.jpg",
+                webUrl: "/img1b.jpg",
+                smallUrl: "/img1b.jpg",
+                mediumUrl: "/img1b.jpg",
+              },
+            },
           ],
         },
       ],
@@ -225,7 +271,10 @@ describe("settingsReducer", () => {
   });
 
   test("unknown action returns state unchanged", () => {
-    const out = settingsReducer(mockState, { type: "UNKNOWN_ACTION" });
+    const out = settingsReducer(
+      mockState,
+      asAction({ type: "UNKNOWN_ACTION" })
+    );
     expect(out).toEqual(mockState);
   });
 });

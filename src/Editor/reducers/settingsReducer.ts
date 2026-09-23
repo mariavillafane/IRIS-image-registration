@@ -1,4 +1,9 @@
-const settingsReducer = (state, action) => {
+import type { EditorAction, EditorSettings } from "../../types";
+
+const settingsReducer = (
+  state: EditorSettings,
+  action: EditorAction
+): EditorSettings => {
   console.log("Settings Reducer - Action:", action.type);
   switch (action.type) {
     case "SET_SETTINGS":

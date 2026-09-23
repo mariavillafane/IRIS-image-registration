@@ -22,31 +22,38 @@ import QueueIcon from "@mui/icons-material/Queue";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
 import { uploadImage } from "../utils/actions";
 import { apiUrl } from "../utils/api";
 import { useJobQueue } from "../utils/hooks";
+import type { Task, TransformationJson } from "../types";
 
-function TransformationData({ id, transformation }) {
-  const [data, setData] = useState({});
+function TransformationData({
+  id,
+  transformation,
+}: {
+  id: string;
+  transformation: string;
+}) {
+  const [data, setData] = useState<TransformationJson>({});
   useEffect(() => {
     fetch(transformation, {
       method: "GET", // *GET, POST, PUT, DELETE, etc.
       mode: "cors", // no-cors, *cors, same-origin
     })
-      .then((x) => x.json())
+      .then((x) => x.json() as Promise<TransformationJson>)
       .then((data) => setData(data));
   }, [transformation]);
 
   return (
     <Box>
-      <h2>{transformation.split("/").at(-1).replace(".json", "")} </h2>
+      <h2>{transformation.split("/").at(-1)?.replace(".json", "")} </h2>
       <Box>
         <Chip label={`tx: ${data?.transformation_obtained_s3?.tx}`} />
         <Chip label={`ty: ${data?.transformation_obtained_s3?.ty}`} />
         <Chip
-          label={`mi: ${data?.transformation_obtained_s4?.mi_average.toFixed(
+          label={`mi: ${data?.transformation_obtained_s4?.mi_average?.toFixed(
             3
           )}`}
         />
@@ -81,14 +88,14 @@ function TransformationData({ id, transformation }) {
   );
 }
 
-function Results({ id, files }) {
-  const transformed = files
+function Results({ id, files }: { id: string; files: string[] | null }) {
+  const transformed = (files ?? [])
     .filter((image) => image.endsWith("transformations.json"))
     .map((t) => {
       const prefix = t.replace("_transformations.json", "");
       return {
         transformation: t,
-        images: files
+        images: (files ?? [])
           .filter((x) => x.startsWith(prefix))
           .filter((x) => x.endsWith(".png")),
       };
@@ -98,11 +105,11 @@ function Results({ id, files }) {
     <>
       {transformed.map((t) => (
         <Box key={t.transformation}>
-          <TransformationData id={id} {...t} />
+          <TransformationData id={id} transformation={t.transformation} />
           <h2>Transformed Images</h2>
           {t.images.map((image) => (
-            <>
-              <Card key={image}>
+            <Fragment key={image}>
+              <Card>
                 <Box
                   display="flex"
                   flexDirection="column"
@@ -122,7 +129,7 @@ function Results({ id, files }) {
                   </a>
                 </Box>
               </Card>
-            </>
+            </Fragment>
           ))}
         </Box>
       ))}{" "}
@@ -130,15 +137,15 @@ function Results({ id, files }) {
   );
 }
 
-export function JobQueueViewer({ id }) {
-  const [results, setResults] = useState(null);
+export function JobQueueViewer({ id }: { id: string }) {
+  const [results, setResults] = useState<string[] | null>(null);
   const jobQueue = useJobQueue();
   const [showDrawer, setShowDrawer] = useState(0);
 
-  const fetchResults = async ({ id, status }) => {
+  const fetchResults = async ({ id, status }: Task) => {
     if (status !== "success") return;
     console.log("feching", id, status);
-    const resultingTransformedImageFiles = await fetch(
+    const resultingTransformedImageFiles: string[] = await fetch(
       apiUrl(`/api/results/${id}`),
       {
         method: "GET", // *GET, POST, PUT, DELETE, etc.
@@ -254,10 +261,9 @@ export function JobQueueViewer({ id }) {
                             <LinearProgress
                               color={
                                 ["success", "error"].includes(x.status)
-                                  ? x.status
+                                  ? (x.status as "success" | "error")
                                   : "primary"
                               }
-                              label={`${x.progress[0]} / ${x.progress[1]}`}
                               variant={
                                 +x.progress[1] ? "determinate" : "indeterminate"
                               }

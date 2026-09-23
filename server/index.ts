@@ -9,6 +9,8 @@ import { importApi } from "./services/import.js";
 
 const app = express(); //express() creates a http server
 
+const port = 4000;
+
 mkdirp("tmp");
 loadTasks();
 
@@ -23,7 +25,7 @@ if (process.env.NODE_ENV !== "production") {
   const allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
   app.use(
     cors({
-      origin: function (origin, callback) {
+      origin: (origin, callback) => {
         // Allow requests with no origin (like curl, postman)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) !== -1) {
@@ -55,8 +57,6 @@ app.use("/registration-ui", express.static("../build"));
 app.get("/", (req, res) => {
   res.redirect("/registration-ui");
 });
-
-const port = 4000;
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);

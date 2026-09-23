@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { Canvg } from "canvg";
-export function useJsonReader(initialPath, method = "readAsDataURL") {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [imageAsDataURL, setImageAsDataURL] = useState(initialPath);
+
+export function useJsonReader(
+  initialPath: string | null,
+  method: "readAsDataURL" | "readAsText" = "readAsDataURL"
+): [string | ArrayBuffer | null, Dispatch<SetStateAction<File | null>>] {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageAsDataURL, setImageAsDataURL] = useState<
+    string | ArrayBuffer | null
+  >(initialPath);
   useEffect(() => {
     if (!selectedFile) {
       return;
@@ -16,7 +23,9 @@ export function useJsonReader(initialPath, method = "readAsDataURL") {
   return [imageAsDataURL, setSelectedFile];
 }
 
-export function readImageAsBase64(file) {
+export function readImageAsBase64(
+  file: File
+): Promise<string | ArrayBuffer | null> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
     reader.onerror = () => reject("error reading file");
@@ -25,10 +34,13 @@ export function readImageAsBase64(file) {
   });
 }
 
-export async function svgToPng(svgText, margin) {
+export async function svgToPng(svgText: string, margin = 0): Promise<string> {
   // convert an svg text to png using the browser
   // can use the domUrl function from the browser
-  const domUrl = window.URL || window.webkitURL || window;
+  const domUrl: typeof window.URL =
+    window.URL ||
+    (window as unknown as { webkitURL?: typeof window.URL }).webkitURL ||
+    window.URL;
   if (!domUrl) {
     throw new Error("(browser doesnt support this)");
   }
@@ -45,6 +57,7 @@ export async function svgToPng(svgText, margin) {
   canvas.width = width + margin * 1.2;
   canvas.height = height + margin * 1.2;
   const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("could not create a 2d context");
 
   const v = Canvg.fromString(ctx, svgText);
   await v.render();

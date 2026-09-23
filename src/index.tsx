@@ -5,8 +5,9 @@ import EditorView from "./Editor";
 import ProjectView from "./Project";
 import reportWebVitals from "./reportWebVitals";
 import { HashRouter, Route, Routes } from "react-router";
+import type { ServerInfo } from "./types";
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
   <React.StrictMode>
     <HashRouter>
@@ -27,7 +28,7 @@ reportWebVitals();
 // Used by apiUrl() to dynamically construct backend URLs in development mode.
 // Uses a relative path so it works before anything else is initialized.
 fetch("/api/server-info")
-  .then((r) => r.json())
+  .then((r) => r.json() as Promise<ServerInfo>)
   .then((info) => {
     window.__SERVER_INFO__ = info;
     console.log("server-info", info);
