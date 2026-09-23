@@ -49,3 +49,4 @@ The frontend (React) and the backend (Express) are both written in TypeScript.
 - Production builds: `yarn build` (client -> `build/`), and `cd server && yarn build` (server -> `server/dist/`, run with `yarn start`)
 - Tests: `CI=true yarn test --watchAll=false`
 - E2E tests: `yarn e2e:install` once, then `yarn e2e` (Playwright; builds client+server as needed, serves the production stack on :4000 and mocks only the registration/job endpoints; upload, thumbnails and saving hit the real backend)
+- E2E videos: failing tests are recorded to `test-results/<test>/video.webm` and traces/screenshots are attached; run `PW_VIDEO=all yarn e2e` to record every test and open everything in the HTML report with `yarn e2e:report`

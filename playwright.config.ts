@@ -15,10 +15,17 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"]],
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://localhost:4000",
     trace: "retain-on-failure",
+    // Videos of failing tests are kept under test-results/<test>/video.webm;
+    // set PW_VIDEO=all to record every test (also browsable via the HTML
+    // report: `yarn e2e:report`).
+    video: {
+      mode: process.env.PW_VIDEO === "all" ? "on" : "retain-on-failure",
+      size: { width: 1280, height: 720 },
+    },
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
   },

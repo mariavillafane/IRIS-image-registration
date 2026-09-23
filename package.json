@@ -48,6 +48,7 @@
     "docker-pull": "docker pull mariavillafane/iris:latest",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
+    "e2e:report": "playwright show-report",
     "e2e:install": "playwright install chromium"
   },
   "eslintConfig": {
