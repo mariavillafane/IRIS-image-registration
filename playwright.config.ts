@@ -19,11 +19,10 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:4000",
     trace: "retain-on-failure",
-    // Videos of failing tests are kept under test-results/<test>/video.webm;
-    // set PW_VIDEO=all to record every test (also browsable via the HTML
-    // report: `yarn e2e:report`).
+    // Every test is recorded (test-results/<test>/video.webm) and browsable
+    // in the HTML report: `yarn e2e:report`.
     video: {
-      mode: process.env.PW_VIDEO === "all" ? "on" : "retain-on-failure",
+      mode: "on",
       size: { width: 1280, height: 720 },
     },
     actionTimeout: 15_000,
