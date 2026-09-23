@@ -150,6 +150,7 @@ export function EditorAppBar({
                 max={99}
               >
                 <IconButton
+                  aria-label="undo"
                   disabled={state.past.length <= 2}
                   size="small"
                   onClick={handleUndo}
@@ -168,6 +169,7 @@ export function EditorAppBar({
                 max={99}
               >
                 <IconButton
+                  aria-label="redo"
                   disabled={state.future.length === 0}
                   size="small"
                   onClick={handleRedo}

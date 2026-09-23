@@ -45,7 +45,10 @@
     "docker-build": "docker build . -t mariavillafane/iris:latest",
     "docker-run": "docker run -p 4000:4000 mariavillafane/iris:latest",
     "docker-push": "docker push mariavillafane/iris:latest",
-    "docker-pull": "docker pull mariavillafane/iris:latest"
+    "docker-pull": "docker pull mariavillafane/iris:latest",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:install": "playwright install chromium"
   },
   "eslintConfig": {
     "extends": [
@@ -66,6 +69,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.27",

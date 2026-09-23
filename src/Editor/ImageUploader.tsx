@@ -71,6 +71,7 @@ function StackUploader({
   return (
     <Paper
       // key={index}
+      data-testid={`stack-card-${index}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -130,6 +131,7 @@ function StackUploader({
                   alignItems={"center"}
                 >
                   <ClearIcon
+                    data-testid={`delete-entry-${entryIndex}`}
                     onClick={() => {
                       if (
                         !window.confirm(
@@ -155,6 +157,7 @@ function StackUploader({
                   />
 
                   <Checkbox
+                    data-testid={`visibility-${entryIndex}`}
                     checked={imageEntry.checked}
                     icon={<VisibilityOffSharpIcon />}
                     checkedIcon={<VisibilitySharpIcon color="primary" />}
@@ -182,6 +185,7 @@ function StackUploader({
           {({ getRootProps, getInputProps }) => (
             <Button
               {...getRootProps()}
+              data-testid={`dropzone-stack-${index}`}
               color="primary"
               sx={{
                 maxWidth: 25,
@@ -209,6 +213,7 @@ function StackUploader({
       >
         <Tooltip title="location x,y">
           <Chip
+            data-testid="stack-location"
             icon={<LocationOnIcon />}
             size="small"
             variant="outlined"
@@ -396,7 +401,7 @@ export function ImageUploader({
       >
         <Dropzone onDrop={onDrop2}>
           {({ getRootProps, getInputProps }) => (
-            <div {...getRootProps()}>
+            <div {...getRootProps()} data-testid="dropzone-fixed">
               <input {...getInputProps()} />
               <Typography
                 sx={{
@@ -440,7 +445,7 @@ export function ImageUploader({
 
         <Dropzone onDrop={onDrop2}>
           {({ getRootProps, getInputProps }) => (
-            <div {...getRootProps()}>
+            <div {...getRootProps()} data-testid="dropzone-moving">
               <input {...getInputProps()} />
 
               <Typography

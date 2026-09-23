@@ -13,11 +13,9 @@ transformApi.post("/api/transform", (req, res) => {
     {}) as Partial<TransformRequestBody>;
 
   if (!transformation || !image) {
-    res
-      .status(400)
-      .json({
-        error: "Request body must include 'transformation' and 'image' paths",
-      });
+    res.status(400).json({
+      error: "Request body must include 'transformation' and 'image' paths",
+    });
     return;
   }
 
