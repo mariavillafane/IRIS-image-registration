@@ -7,7 +7,7 @@ on:
 
 jobs:
   docker-build:
-    name: Docker build
+    name: Docker build & Python tests
     runs-on: ubuntu-latest
 
     steps:
@@ -22,9 +22,23 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: iris:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The image contains the pinned registration env (python 3.6,
+      # SimpleITK 1.2.4, opencv 3.4.2) - run the registration scripts' tests
+      # inside it instead of recreating the env with pip.
+      - name: Run Python tests (rotated bounding box unit tests)
+        run: |
+          docker run --rm iris:ci bash --login -c \
+            "cd /app && python scripts_registration/test_rotated_bounding_box.py"
+
+      - name: Run Python tests (registration integration checks)
+        run: |
+          docker run --rm iris:ci bash --login -c \
+            "cd /app && python scripts_registration/verify_rotated_bounding_box_integration.py"
 
   e2e:
     name: E2E tests
