@@ -20,6 +20,20 @@ import cv2
 import base64
 from PIL import Image
 
+from geometry import get_rotated_bounding_box_pixels #260923 - pixel bbox (and displacement) of the rotated moving image for the ROI crop
+
+
+#260923 - composite-transform construction that works on both sitk 1.2.4 (the
+#version pinned in environment.yml, where sitk.Transform(2, sitk.sitkComposite)
+#returns a composite) and newer sitk versions (which require
+#sitk.CompositeTransform)
+def new_composite_transform(dimension=2):
+    tx = sitk.Transform(dimension, sitk.sitkComposite)
+    if not hasattr(tx, 'AddTransform'):
+        tx = sitk.CompositeTransform(dimension)
+    return tx
+
+
 
 #230119 - NEW FROM STRACH
 
@@ -32,9 +46,9 @@ def load_json_from_path(path_json):
 
 #230119 - 221114 for Miniatures (each XRF comes in a dedicated .jpeg file, still need to be put together as a datacube)
 def get_datacube_from_single_images(config_path_moving_images): #config
-    #datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY), dtype=np.float) for slice, path in config_path_moving_images['path_moving_images'].items()}
-    #datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY), dtype=np.float) for slice, path in config_path_moving_images['path_moving_images'].items()} #251014
-    datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path, cv2.IMREAD_ANYDEPTH), cv2.COLOR_BGR2GRAY), dtype=np.float) for slice, path in config_path_moving_images['path_moving_images'].items()} #251016
+    #datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY), dtype=float) for slice, path in config_path_moving_images['path_moving_images'].items()}
+    #datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY), dtype=float) for slice, path in config_path_moving_images['path_moving_images'].items()} #251014
+    datacube_eq = {slice: np.asarray(cv2.cvtColor(cv2.imread(path, cv2.IMREAD_ANYDEPTH), cv2.COLOR_BGR2GRAY), dtype=float) for slice, path in config_path_moving_images['path_moving_images'].items()} #251016
     datacube_from_path = {**config_path_moving_images, 'datacube_eq': datacube_eq}
     return datacube_from_path
 
@@ -114,21 +128,31 @@ def get_moving_images_from_json_dict__imagestack(data_from_json, no_of_datacube)
 
 # 231214
 # 211014 - for final registration
-def get_transform_from_parameters_bspline_fullFixedimage_translation(best_tr_s4, best_tr_s3, fixed_parameters, loc_at_crop):
-    finalTx_ = sitk.Transform(2, sitk.sitkComposite)  # dimension = 2
+#260923 - the transform is rebuilt pivot-anchored and expressed on the FULL fixed
+#image: T_full(p) = P + M.(B(p - roi_origin) - P) + t, with P = rotation_pivot
+#(the moving image's top-left corner within the cropped fixed image), M = the s3
+#affine matrix, B = the s4 bspline and t = the s3 translation parameter
+#(loc_at_crop, recorded around the pivot centre by the s3 optimiser). The
+#roi_origin shift converts between full-image and ROI coordinates. Before 260923
+#the roi_origin shift was folded in front of the bspline and the affine was not
+#pivot-anchored - exact for rotation = 0, misplaced by (M - I).(t + 2P) once
+#rotated.
+def get_transform_from_parameters_bspline_fullFixedimage_translation(best_tr_s4, best_tr_s3, fixed_parameters, loc_at_crop, fixed_crop_origin=(0.0, 0.0), rotation_pivot=None):
+    # finalTx_ is an empty "addition friendly" transform, we need to pass params to it. We pass these params by adding scale_rotation_and_tr to this empty transform
+
+    if rotation_pivot is None:
+        rotation_pivot = (-loc_at_crop[0], -loc_at_crop[1]) #pre-260923 behaviour
+
+    finalTx_ = new_composite_transform(2)
 
     # best_tr_s3__array_of_values  == values for affine + final translation
     best_tr_s3_av = list(best_tr_s3.values())
 
-    final_translation = sitk.TranslationTransform(2)
-    final_translation.SetParameters((best_tr_s3_av[4]-loc_at_crop[0], best_tr_s3_av[5]-loc_at_crop[1])) #location at cropped-fixed image ('original' final from s3) # e.g. loc_at_crop = [-26, -15]
-    print('0- final_translation 2 = ' + str(final_translation.GetParameters()))
-
     affine_tr = sitk.AffineTransform(2)
-    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], loc_at_crop[0], loc_at_crop[1])) #211014
-
-    #211014 - COMPOSING THE FINAL ENSEMBLED TRANSFORM
-    finalTx_.AddTransform(affine_tr)
+    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], 0.0, 0.0))
+    #260923 - pivot-anchored affine carrying the s3 translation parameter
+    affine_tr.SetCenter((rotation_pivot[0], rotation_pivot[1]))
+    affine_tr.SetTranslation((loc_at_crop[0], loc_at_crop[1]))
 
     bspline = sitk.BSplineTransform(2)
     bspline.SetFixedParameters(fixed_parameters)
@@ -137,8 +161,15 @@ def get_transform_from_parameters_bspline_fullFixedimage_translation(best_tr_s4,
     params_transform = np.asarray(best_tr_s4__array_of_values[0:-1], dtype=float)  # here we remove mi_average
     bspline.SetParameters(params_transform)
 
+    shift_into_roi = sitk.TranslationTransform(2)
+    shift_into_roi.SetParameters((-fixed_crop_origin[0], -fixed_crop_origin[1]))
+
+    #add in REVERSE application order (a SimpleITK composite applies the
+    #last-added transform first): application order =
+    #shift_into_roi -> bspline -> affine   (== T_full above)
+    finalTx_.AddTransform(affine_tr)
     finalTx_.AddTransform(bspline)
-    finalTx_.AddTransform(final_translation)
+    finalTx_.AddTransform(shift_into_roi)
     print('3- finalTx_(translation + affine + bspline) = ' + str(finalTx_))
 
     return finalTx_
@@ -231,7 +262,7 @@ def stringToImage_COLOR(base64_string):
 #251208. function to transform pillow-image (whether 8-bit or 16-bit) to 8-bit
 def toGRAY_as_8bit_even_if_original_image_is_16bit(pil_image):
     #get array from pil_image and ensure it is written as 8-bit array 
-    image_as_array = np.array(pil_image, dtype=np.float) #WORKS
+    image_as_array = np.array(pil_image, dtype=float) #WORKS
     image_as_array_8bit = (((image_as_array - image_as_array.min()) / (image_as_array.max() - image_as_array.min())) * 255.9).astype(np.uint8) #WORKS
     #get pil_image from 8-bit array, and then transofrm into a greyscale image
     pil_image_8bit_from_array = Image.fromarray(np.uint8(image_as_array_8bit))
@@ -244,7 +275,7 @@ def toGRAY_as_8bit_even_if_original_image_is_16bit(pil_image):
 # 230209 = array needs to be FLOAT np.dtype
 # 230208 = convert PIL Image to an RGB/Grey image ( technically a numpy array ) that's compatible with opencv
 def toGRAY(image):
-    return np.array(image.convert('L'), dtype=np.float) #return cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB) #for color image
+    return np.array(image.convert('L'), dtype=float) #return cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB) #for color image
 
 
 # 230209
@@ -259,7 +290,7 @@ def get_datacube_from_path_xray_generic(config):
     #x-rays = if str('.jpg') in str(config['path_moving_images']):
     if str('.jpg') or str('.tif') in str(config['path_moving_images']):
         mov_img = cv2.imread(config['path_moving_images'])
-        datacube_eq = {str(slice): np.asarray(cv2.cvtColor(mov_img, cv2.COLOR_BGR2GRAY), dtype=np.float) for slice in config['slices']}
+        datacube_eq = {str(slice): np.asarray(cv2.cvtColor(mov_img, cv2.COLOR_BGR2GRAY), dtype=float) for slice in config['slices']}
 
     #220127 - MA-XRF (Titian NG6420 only, as != DaVinci NG1093)
     #format moving images = 'C:/Users/eugen/Desktop/2020_ICL/Pycharm_data/NG6420/'+ datacube_no +'_elemental_map_' + str(slice_no) +'.mat'
@@ -279,7 +310,7 @@ def get_datacube_from_path_xray_generic(config):
 
 #(not checked on 230119)
 def get_datacube_from_images(path_moving_images, datacube_no, slices):
-    dict = {str(slice): np.asarray(np.transpose(get_slice(path_moving_images, datacube_no, slice)), dtype=np.float) for slice in slices}
+    dict = {str(slice): np.asarray(np.transpose(get_slice(path_moving_images, datacube_no, slice)), dtype=float) for slice in slices}
     return dict
 
 
@@ -549,28 +580,41 @@ def get_location_to_crop_fixed_image_margin(config, slice):
     subdivided_image_shape = config[slice + config['tile']].shape
     print('subdivided image: shape (orig size = h,w) = ' + str(subdivided_image_shape))
 
-    # 221213 (Dec2022)
-    if (config['ini_pos_d'][0] < 0):
-        #fix_crop_left = int(np.absolute(config['ini_pos_d'][0]) * config['scaling_coef'])
-        fix_crop_left = int(np.absolute(config['ini_pos_d'][0]))
-        #if movingImage lies within area of fixedImage (ini_pos_d = negative values), hacer crop a fixed image.
-    else:
-        fix_crop_left = 0
-        #if movingImage falls outside of fixedImage, no hacer crop a fixed image.
+    # 260923 - the fixed-image ROI (the analysis canvas) must fully contain the
+    # ROTATED moving image. The moving image (tile) is placed with its top-left
+    # corner at (-ini_pos_d) in full fixed-image coordinates and rotated by
+    # config['rotation'] degrees about that corner (same pivot as the UI preview
+    # and as the s1 initial transform). The rotated bounding box is DISPLACED
+    # from the placement corner (e.g. a clockwise rotation swings the image to
+    # the LEFT of it), so the box is positioned on the fixed image using the
+    # displacement returned by get_rotated_bounding_box:
+    #     bbox_origin = placement_corner - (displacement_x, displacement_y)
+    # Previously the unrotated tile size was used, which cropped the rotated
+    # image (partially at e.g. 30 deg, completely at 90 deg).
+    rotation_degrees = config['rotation']   #full float precision - never rounded
+    rot_bbox = get_rotated_bounding_box_pixels(int(subdivided_image_shape[1]), int(subdivided_image_shape[0]), rotation_degrees, centre_of_rotation='top_left_corner')
+    corner_x = -int(config['ini_pos_d'][0])     # placement corner of the moving image (full fixed-image coords)
+    corner_y = -int(config['ini_pos_d'][1])
 
-    if (config['ini_pos_d'][1] < 0):
-        #fix_crop_top = int(np.absolute(config['ini_pos_d'][1]) * config['scaling_coef'])
-        fix_crop_top = int(np.absolute(config['ini_pos_d'][1]))
-    else:
-        fix_crop_top = 0
+    bbox_x0 = corner_x - rot_bbox['displacement_x']
+    bbox_y0 = corner_y - rot_bbox['displacement_y']
+    bbox_x1 = bbox_x0 + rot_bbox['width']
+    bbox_y1 = bbox_y0 + rot_bbox['height']
 
+    # clamp the box to the fixed image (regions of the rotated image outside the
+    # fixed image cannot be registered - the ROI is the intersection)
+    fix_crop_left = max(bbox_x0, 0)
+    fix_crop_top = max(bbox_y0, 0)
+    fix_crop_right = int(fixed_scaled_shape[1]) - min(bbox_x1, int(fixed_scaled_shape[1]))
+    fix_crop_bottom = int(fixed_scaled_shape[0]) - min(bbox_y1, int(fixed_scaled_shape[0]))
+
+    if (fix_crop_left >= int(fixed_scaled_shape[1]) - fix_crop_right) or (fix_crop_top >= int(fixed_scaled_shape[0]) - fix_crop_bottom):
+        raise ValueError('the placed/rotated moving image does not overlap the fixed image (placement corner ' + str((corner_x, corner_y)) + ', rotation ' + str(rotation_degrees) + ' deg) - check x, y and rotation in the UI')
+
+    print('rotation (degrees, UI/canvas convention) = ' + str(rotation_degrees))
+    print('rotated bbox = w' + str(rot_bbox['width']) + ' x h' + str(rot_bbox['height']) + ', displacement from placement corner = ' + str((rot_bbox['displacement_x'], rot_bbox['displacement_y'])))
     print('fix_crop_left = ' + str(fix_crop_left))
     print('fix_crop_top = ' + str(fix_crop_top))
-
-    #fix_crop_right = int(fixed_full_shape[1] * config['scaling_coef_fixed']) - fix_crop_left - int(subdivided_image_shape[1])
-    fix_crop_right = int(fixed_scaled_shape[1]) - fix_crop_left - int(subdivided_image_shape[1])
-    #fix_crop_bottom = int(fixed_full_shape[0] * config['scaling_coef_fixed']) - fix_crop_top - int(subdivided_image_shape[0])
-    fix_crop_bottom = int(fixed_scaled_shape[0]) - fix_crop_top - int(subdivided_image_shape[0])
 
     print('fix_crop_right = ' + str(fix_crop_right))
     print('fix_crop_bottom = ' + str(fix_crop_bottom))
@@ -618,6 +662,19 @@ def get_initial_locations(config):
         'ini_loc_within_fixed_ROI': ini_loc_within_fixed_ROI
     }
     return initial_locations
+
+
+#260923 - the rotation pivot: the position of the moving image's top-left corner
+#(its placement point) within the cropped fixed image (ROI). This is the same
+#for every search stage (s1..s4 share the same ROI). Note that
+#ini_loc_within_fixed_ROI equals -(this pivot) only for search s1 (where the
+#placement is the initial translation); for the later stages it holds the
+#previous stage's optimised translation parameter, so the pivot is derived from
+#the original placement (ini_pos_d) and the ROI origin instead.
+def get_rotation_pivot_within_roi(config):
+    pivot_x = -int(config['ini_pos_d'][0]) - config['fixed_crop_pos_x_margin'][0]
+    pivot_y = -int(config['ini_pos_d'][1]) - config['fixed_crop_pos_y_margin'][0]
+    return (pivot_x, pivot_y)
 
 
 
@@ -843,7 +900,7 @@ def setup_registration_algorithm_R__4_6_bspline(config):
 # 230124 - 221116 - add rot at initial transform // also follows propagation of s1 into s2 / s2 into s3 (as with s3 into s4, in v1)
 def set_initial_transformation_affine__4_6_bspline(initial_loc_mov, spacesize, config):
     print(str(config['filename']) + ': set_initial_transformation ')
-    initialTx = sitk.Transform(2, sitk.sitkComposite)  # dimension = 2
+    initialTx = new_composite_transform(2)
 
     # initialTx = sitk.CenteredTransformInitializer(fixed, moving, sitk.AffineTransform(fixed.GetDimension()), sitk.CenteredTransformInitializerFilter.GEOMETRY)
     # initialTx.SetParameters((-202.5, -409.5))
@@ -855,16 +912,24 @@ def set_initial_transformation_affine__4_6_bspline(initial_loc_mov, spacesize, c
         rotation_and_tr = sitk.Similarity2DTransform()
         #https://simpleitk.org/SPIE2019_COURSE/01_spatial_transformations.html
 
-        if ((config['ini_rot_moving_img']['centre_of_rot']) == 'center_of_image'):
-            print('rotation: center_of_image == ' + str(rotation_and_tr.GetCenter()))
-            rotation_and_tr.SetCenter((rotation_and_tr.GetCenter())) #((300, 300))
+        # 260923 - the rotation pivot is the moving image's top-left corner (the
+        # same pivot as the UI preview). Its position within the fixed-image ROI
+        # is (-initial_loc_mov), because ini_loc_within_fixed_ROI == -(pivot in
+        # ROI). Anchoring the transform at the pivot keeps the corner pinned for
+        # ANY angle/scale the optimiser explores, so the rotated image stays
+        # placed as in the UI inside the bounding-box ROI. (Previously the center
+        # stayed at the default (0,0), which rotated the image about the ROI
+        # origin once the ROI was larger than the unrotated footprint.)
+        if ((config['ini_rot_moving_img']['centre_of_rot']) != 'top_left_corner'):
+            raise NotImplementedError("centre_of_rot = '" + str(config['ini_rot_moving_img']['centre_of_rot']) + "' is not supported - only 'top_left_corner' is implemented")
 
         rotation_and_tr.SetAngle(config['ini_rot_moving_img']['rot']) #rotation_and_tr.SetAngle(1/57*1.5)
-        #rotation_and_tr.SetCenter((5,6))
         print('set_initial_transformation: initial_rotation = ' + str(config['ini_rot_moving_img']['rot']))
 
+        rotation_and_tr.SetCenter(get_rotation_pivot_within_roi(config))
         rotation_and_tr.SetTranslation((initial_loc_mov[0], initial_loc_mov[1]))
         print('set_initial_transformation: initial_loc_mov = ' + str(initial_loc_mov[0]) +', '+ str(initial_loc_mov[1]))
+        print('set_initial_transformation: rotation pivot (within ROI) = ' + str(get_rotation_pivot_within_roi(config)))
         # initialTx.AddTransform(sitk.TranslationTransform(2, (-200, -100)))
         # initialTx.AddTransform(sitk.ScaleTransform(2, (0.5, 1)))
         initialTx.AddTransform(rotation_and_tr)
@@ -873,7 +938,14 @@ def set_initial_transformation_affine__4_6_bspline(initial_loc_mov, spacesize, c
         similarity2D_tr = sitk.Similarity2DTransform()
         # best_tr_s1__array_of_values
         best_tr_s1_av = list(config['best_transform_so_far'].values())
-        similarity2D_tr.SetParameters((best_tr_s1_av[0], best_tr_s1_av[1], initial_loc_mov[0], initial_loc_mov[1]))
+        # 260923 - pivot-anchored: the pivot (the moving image's top-left corner
+        # within the ROI) is the same for every stage, and the translation is the
+        # s1 optimiser's translation parameter, so this initial transform
+        # reproduces the s1 best transform exactly
+        similarity2D_tr.SetCenter(get_rotation_pivot_within_roi(config))
+        similarity2D_tr.SetScale(best_tr_s1_av[0])
+        similarity2D_tr.SetAngle(best_tr_s1_av[1])
+        similarity2D_tr.SetTranslation((initial_loc_mov[0], initial_loc_mov[1]))
         print('similarity2D_tr (best_tr_s1)= ' + str(similarity2D_tr))
 
         # ADD TRANSFORMATIONS - best_search1 for search2
@@ -883,11 +955,20 @@ def set_initial_transformation_affine__4_6_bspline(initial_loc_mov, spacesize, c
         similarity2D_tr = sitk.Similarity2DTransform()
         # best_tr_s2__array_of_values
         best_tr_s2_av = list(config['best_transform_so_far'].values())
-        similarity2D_tr.SetParameters((best_tr_s2_av[0], best_tr_s2_av[1], initial_loc_mov[0], initial_loc_mov[1]))
+        # 260923 - pivot-anchored (the pivot is stage-independent, see
+        # get_rotation_pivot_within_roi); with the s2 translation parameter this
+        # reproduces the s2 best transform exactly
+        similarity2D_tr.SetCenter(get_rotation_pivot_within_roi(config))
+        similarity2D_tr.SetScale(best_tr_s2_av[0])
+        similarity2D_tr.SetAngle(best_tr_s2_av[1])
+        similarity2D_tr.SetTranslation((initial_loc_mov[0], initial_loc_mov[1]))
 
         transform_for_shear = sitk.AffineTransform(2)
         # 211209 - here is taking the values from s2 as a matrix to initialize s3 (matrix is only a11,a12,a21,a22 =>needs translation on top)
         transform_for_shear.SetMatrix(similarity2D_tr.GetMatrix())
+        # 260923 - anchor the pivot: T(p) = P + M.(p - P) + t, i.e. the s2 best
+        # transform (matrix M from s2, translation parameter t = initial_loc_mov)
+        transform_for_shear.SetCenter(get_rotation_pivot_within_roi(config))
         # 211209 - add translation, as this not appears in matrix = a11,a12,a21,a22
         transform_for_shear.SetTranslation((initial_loc_mov[0], initial_loc_mov[1]))
         initialTx.AddTransform(transform_for_shear)
@@ -903,7 +984,11 @@ def set_initial_transformation_affine__4_6_bspline(initial_loc_mov, spacesize, c
         # best_tr_s3__array_of_values
         best_tr_s3_av = list(config['best_transform_so_far'].values())
         affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3],
-                                 initial_loc_mov[0], initial_loc_mov[1]))
+                                 0.0, 0.0))
+        # 260923 - anchor the pivot: T(p) = P + M.(p - P) + t, i.e. the s3 best
+        # transform (matrix M from s3, translation parameter t = initial_loc_mov)
+        affine_tr.SetCenter(get_rotation_pivot_within_roi(config))
+        affine_tr.SetTranslation((initial_loc_mov[0], initial_loc_mov[1]))
 
         # ADD TRANSFORMATIONS - best_search3 + Initialiser (bspline) for search4
         initialTx.AddTransform(affine_tr)
@@ -1221,13 +1306,18 @@ def get_average_metric_for_bspline_transform(config, param): #config = config_fi
     fixed = sitk.GetImageFromArray(config['fixed_array'])
 
     # set composite Tr
-    initialTx = sitk.Transform(2, sitk.sitkComposite)  # dimension = 2
+    initialTx = new_composite_transform(2)
 
     # initialise Tr with affine = best_tr_s3 (config['best_transform_so_far'])
     affine_tr = sitk.AffineTransform(2)
     iniloc = config['ini_loc_within_fixed_ROI']
     best_tr_s3_av = list(config['best_transform_so_far'].values())     # best_tr_s3__array_of_values
-    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], iniloc[0], iniloc[1]))
+    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], 0.0, 0.0))
+    # 260923 - anchor the pivot: T(p) = P + M.(p - P) + t reproducing the s4
+    # initial composite (affine anchored at the pivot; the translation is the s3
+    # translation parameter recorded in iniloc)
+    affine_tr.SetCenter(get_rotation_pivot_within_roi(config))
+    affine_tr.SetTranslation((iniloc[0], iniloc[1]))
     initialTx.AddTransform(affine_tr)
 
     # re-initialise Tr with bspline with fixed params (from transform-mesh-domain) and params from best_tr_s4
@@ -1286,19 +1376,21 @@ def get_registered_images_from_array__2_transforms_bspline_by_slice(slice, confi
     #moving_image = sitk.GetImageFromArray(config['datacube_eq'][str(slice)])  # 221205 - original moving image as per path
     moving_image = sitk.GetImageFromArray(config[str(slice) + config['tile']])  # 230130 - this image will be scaled and cropped as per settings
 
+    rotation_pivot = get_rotation_pivot_within_roi(config) #260923 - pivot for the recorded translation parameters
+
     if len(config['spacesize']) == 4:
         params_transform = [best_tr_s3['scale'], best_tr_s3['rot'], int(best_tr_s3['tx'] + config['fixed_crop_pos_x_margin'][0]), int(best_tr_s3['ty'] + config['fixed_crop_pos_y_margin'][0])]
         print('params_transform = ' + str(params_transform))
-        finalTx = get_transform_from_parameters(params_transform)
+        finalTx = get_transform_from_parameters(params_transform, rotation_pivot)
 
     if len(config['spacesize']) == 6:
         params_transform = [best_tr_s3['a11'], best_tr_s3['a12'], best_tr_s3['a21'], best_tr_s3['a22'], int(best_tr_s3['tx'] + config['fixed_crop_pos_x_margin'][0]), int(best_tr_s3['ty'] + config['fixed_crop_pos_y_margin'][0])]
         print('params_transform = ' + str(params_transform))
-        finalTx = get_transform_from_parameters_affine(params_transform)
+        finalTx = get_transform_from_parameters_affine(params_transform, rotation_pivot)
 
         params_transform_ift = [ideal_final_tr['a11'], ideal_final_tr['a12'], ideal_final_tr['a21'], ideal_final_tr['a22'], int(ideal_final_tr['tx'] + config['fixed_crop_pos_x_margin'][0]), int(ideal_final_tr['ty'] + config['fixed_crop_pos_y_margin'][0])]
         print('params_transform (ideal best tr) = ' + str(params_transform_ift))
-        finalTx_ift = get_transform_from_parameters_affine(params_transform_ift)
+        finalTx_ift = get_transform_from_parameters_affine(params_transform_ift, rotation_pivot)
 
     if len(config['spacesize']) == 2:
         params_transform = best_tr_s4
@@ -1312,12 +1404,15 @@ def get_registered_images_from_array__2_transforms_bspline_by_slice(slice, confi
     fixed_image = get_crop_fixed_image_from_array(config)
     save_transform_and_image_0(finalTx, fixed_image['fixed_sitk'], moving_image, str(config['datacube_no']) + "_finalAlignment_" + str(slice), config)
 
-#230130
-def get_transform_from_parameters(params_transform):
+#230130 - updated 260923: pivot-anchored (the recorded translation parameter is
+#relative to the pivot centre, so the pivot must be anchored here too)
+def get_transform_from_parameters(params_transform, pivot=(0.0, 0.0)):
     # finalTx_ is an empty "addition friendly" transform, we need to pass params to it. We pass these params by adding scale_rotation_and_tr to this empty transform
-    finalTx_ = sitk.Transform(2, sitk.sitkComposite) #dimension = 2
+    finalTx_ = new_composite_transform(2)
 
     scale_rotation_and_tr = sitk.Similarity2DTransform()
+    # 260923 - pivot-anchored: T(p) = P + scale.rotation.(p - P) + translation
+    scale_rotation_and_tr.SetCenter(pivot)
     scale_rotation_and_tr.SetTranslation((params_transform[-2], params_transform[-1]))        #close to expected tranform d11 >> (-401, -609)
     scale_rotation_and_tr.SetScale((params_transform[-4]))                                ## initialTx.AddTransform(sitk.ScaleTransform(2, (0.5, 1)))
     scale_rotation_and_tr.SetAngle(params_transform[-3])
@@ -1327,13 +1422,17 @@ def get_transform_from_parameters(params_transform):
     return finalTx_
 
 
-#230130
-def get_transform_from_parameters_affine(params_transform):
+#230130 - updated 260923: pivot-anchored (the recorded translation parameter is
+#relative to the pivot centre, so the pivot must be anchored here too)
+def get_transform_from_parameters_affine(params_transform, pivot=(0.0, 0.0)):
     # finalTx_ is an empty "addition friendly" transform, we need to pass params to it.
-    finalTx_ = sitk.Transform(2, sitk.sitkComposite) #dimension = 2
+    finalTx_ = new_composite_transform(2)
 
     scale_rotation_and_tr_and_shear = sitk.AffineTransform(2)
-    scale_rotation_and_tr_and_shear.SetParameters((params_transform[0], params_transform[1], params_transform[2], params_transform[3], params_transform[4], params_transform[5]))
+    # 260923 - pivot-anchored: T(p) = P + M.(p - P) + translation
+    scale_rotation_and_tr_and_shear.SetParameters((params_transform[0], params_transform[1], params_transform[2], params_transform[3], 0.0, 0.0))
+    scale_rotation_and_tr_and_shear.SetCenter(pivot)
+    scale_rotation_and_tr_and_shear.SetTranslation((params_transform[4], params_transform[5]))
 
     finalTx_.AddTransform(scale_rotation_and_tr_and_shear)
 
@@ -1345,12 +1444,17 @@ def get_transform_from_parameters_bspline(best_tr_s4, best_tr_s3, config):
     # finalTx_ is an empty "addition friendly" transform, we need to pass params to it. We pass these params by adding scale_rotation_and_tr to this empty transform
 
     iniloc = config['ini_loc_within_fixed_ROI']
-    finalTx_ = sitk.Transform(2, sitk.sitkComposite)  # dimension = 2
+    finalTx_ = new_composite_transform(2)
 
     affine_tr = sitk.AffineTransform(2)
 
     best_tr_s3_av = list(best_tr_s3.values())
-    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], iniloc[0], iniloc[1])) #see iniloc is used instead of (best_tr_s3_av[4], best_tr_s3_av[5])
+    affine_tr.SetParameters((best_tr_s3_av[0], best_tr_s3_av[1], best_tr_s3_av[2], best_tr_s3_av[3], 0.0, 0.0))
+    # 260923 - anchor the pivot: T(p) = P + M.(p - P) + t reproducing the s4
+    # optimised composite (affine anchored at the pivot; the translation is the
+    # s3 translation parameter recorded in iniloc)
+    affine_tr.SetCenter(get_rotation_pivot_within_roi(config))
+    affine_tr.SetTranslation((iniloc[0], iniloc[1])) #see iniloc is used instead of (best_tr_s3_av[4], best_tr_s3_av[5])
 
     finalTx_.AddTransform(affine_tr)
 
@@ -1446,8 +1550,8 @@ def get_image_as_array_from_path_v0(path):
 
 #250114 - to solve the problem of applying identified best transformation to images other than those in moving image (and of format other than JPG, i.e. to apply to TIFF images)
 def get_image_as_array_from_path(path):
-    #image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY), dtype=np.float) #muted 251014
-    image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY), dtype=np.float) #251014
+    #image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY), dtype=float) #muted 251014
+    image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY), dtype=float) #251014
     #cv2.imwrite(str(path) + 'rawdata_opencv2_fromArray' + '.tiff', image_as_array)
     return image_as_array
 
