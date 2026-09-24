@@ -45,7 +45,11 @@
     "docker-build": "docker build . -t mariavillafane/iris:latest",
     "docker-run": "docker run -p 4000:4000 mariavillafane/iris:latest",
     "docker-push": "docker push mariavillafane/iris:latest",
-    "docker-pull": "docker pull mariavillafane/iris:latest"
+    "docker-pull": "docker pull mariavillafane/iris:latest",
+    "e2e": "node scripts/e2e-cleanup.mjs && playwright test",
+    "e2e:headed": "node scripts/e2e-cleanup.mjs && playwright test --headed",
+    "e2e:report": "playwright show-report",
+    "e2e:install": "playwright install chromium"
   },
   "eslintConfig": {
     "extends": [
@@ -66,11 +70,17 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
     "gh-pages": "^4.0.0",
     "http-proxy-middleware": "^3.0.0",
     "husky": "^8.0.1",
     "lint-staged": "^13.0.3",
-    "prettier": "^2.7.1"
+    "prettier": "^2.7.1",
+    "typescript": "^5.9.2"
   },
   "lint-staged": {
     "**/*": "prettier --write --ignore-unknown"
