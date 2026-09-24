@@ -59,51 +59,33 @@ const CanvasImage = (props: CanvasImageProps) => {
   );
 };
 
-const ComparisonClipPathRectangle = ({
+export const ComparisonClipPathRectangle = ({
   orientation,
   mousepos,
-  w,
-  h,
 }: {
   orientation: number;
   mousepos: Point;
-  w: number;
-  h: number;
 }) => {
-  switch (orientation % 8) {
-    case 0:
-      return <rect x={mousepos.x} y={0} width={w} height={h} />;
-    case 1:
-      return (
-        <rect x={0} y={mousepos.y} width={w} height={h} /> //3
-      );
-    case 2:
-      return (
-        <rect x={0} y={0} width={mousepos.x} height={h} /> //2
-      );
-    case 3:
-      return (
-        <rect x={0} y={0} width={w} height={mousepos.y} /> //1
-      );
-    case 4:
-      return (
-        <rect x={mousepos.x} y={0} width={w} height={mousepos.y} /> //1
-      );
-    case 5:
-      return (
-        <rect x={mousepos.x} y={mousepos.y} width={w} height={h} /> //2ok
-      );
-    case 6:
-      return (
-        <rect x={0} y={mousepos.y} width={mousepos.x} height={h} /> //3
-      );
-    case 7:
-      return (
-        <rect x={0} y={0} width={mousepos.x} height={mousepos.y} /> //4
-      );
-    default:
-      return null;
-  }
+  // The curtain reveals a HALF-PLANE relative to the mouse, with its edge(s)
+  // exactly at the mouse position. The rect must be unbounded away from the
+  // mouse: bounding it to the fixed-image box [0..w]x[0..h] cropped rotated
+  // moving images that stick out beyond that box, and re-hid the image once
+  // the mouse moved far enough that the rect's far edge overtook it.
+  // Half-planes per orientation (same reveal sides as before):
+  //   0 right | 1 below | 2 left | 3 above
+  //   4 right+above | 5 right+below | 6 left+below | 7 left+above
+  const BIG = 10000;
+  const o = ((orientation % 8) + 8) % 8;
+  const left = [2, 6, 7].includes(o);
+  const right = [0, 4, 5].includes(o);
+  const above = [3, 4, 7].includes(o);
+  const below = [1, 5, 6].includes(o);
+
+  const x0 = left ? mousepos.x - BIG : right ? mousepos.x : -BIG;
+  const x1 = left ? mousepos.x : right ? mousepos.x + BIG : BIG;
+  const y0 = above ? mousepos.y - BIG : below ? mousepos.y : -BIG;
+  const y1 = above ? mousepos.y : below ? mousepos.y + BIG : BIG;
+  return <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} />;
 };
 
 interface RegistrationCanvasProps {
@@ -242,8 +224,6 @@ export function RegistrationCanvas(props: RegistrationCanvasProps) {
               <ComparisonClipPathRectangle
                 orientation={props.orientation}
                 mousepos={props.mousepos}
-                w={w}
-                h={h}
               />
             </clipPath>
           </defs>
