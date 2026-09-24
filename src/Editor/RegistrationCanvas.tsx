@@ -23,33 +23,39 @@ interface CanvasImageProps {
 
 const CanvasImage = (props: CanvasImageProps) => {
   const [retry, setRetry] = useState(0);
+  // The curtain clipPath must live on a transform-free <g>, NOT on the <image>:
+  // an element's own transform (the rotate() here) also applies to its
+  // clip-path, so the reveal rect would be interpreted in the image's rotated
+  // space and the curtain would swing with the moving image's rotation instead
+  // of following the mouse. The <g> keeps the clip in canvas coordinates.
   return (
-    <image
-      onError={(e) => {
-        console.log(e);
-        if (retry < 3) {
-          setTimeout(() => {
-            setRetry(retry + 1);
-          }, 100);
+    <g clipPath={props.clipPath}>
+      <image
+        onError={(e) => {
+          console.log(e);
+          if (retry < 3) {
+            setTimeout(() => {
+              setRetry(retry + 1);
+            }, 100);
+          }
+        }}
+        //data-id={props.i}
+        data-stack-index={props.i}
+        data-stack-id={props.stackId}
+        data-entry-id={props.entryId}
+        x={props.x}
+        y={props.y}
+        opacity={props.opacity}
+        href={`${props.imageUrl ?? ""}${retry ? "?" + retry : ""}`}
+        width={
+          props.width !== undefined ? props.width * props.scaling! : undefined
         }
-      }}
-      //data-id={props.i}
-      data-stack-index={props.i}
-      data-stack-id={props.stackId}
-      data-entry-id={props.entryId}
-      x={props.x}
-      y={props.y}
-      opacity={props.opacity}
-      href={`${props.imageUrl ?? ""}${retry ? "?" + retry : ""}`}
-      width={
-        props.width !== undefined ? props.width * props.scaling! : undefined
-      }
-      height={
-        props.height !== undefined ? props.height * props.scaling! : undefined
-      }
-      transform={`rotate(${props.rotation},${props.x},${props.y})`}
-      clipPath={props.clipPath}
-    />
+        height={
+          props.height !== undefined ? props.height * props.scaling! : undefined
+        }
+        transform={`rotate(${props.rotation},${props.x},${props.y})`}
+      />
+    </g>
   );
 };
 
