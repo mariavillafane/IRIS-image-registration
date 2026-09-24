@@ -9,7 +9,7 @@ import { importApi } from "./services/import.js";
 
 const app = express(); //express() creates a http server
 
-mkdirp("tmp");
+mkdirp("uploads/tmp");
 loadTasks();
 
 // Increase request body size limits for large file uploads

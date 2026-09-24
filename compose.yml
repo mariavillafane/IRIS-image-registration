@@ -1,3 +1,8 @@
+#default: run the published image.
+#to build and run the LOCAL code instead (e.g. to test fixes), use:
+#  docker compose -f compose.yml -f compose.build.yml up
+#(see compose.build.yml - it builds this repo into iris:local and persists
+#uploads/results in named volumes)
 services:
   iris:
     image: mariavillafane/iris:latest
