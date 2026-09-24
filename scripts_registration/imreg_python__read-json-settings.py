@@ -35,6 +35,7 @@ from functions import   get_datacube_from_images, \
                         get_transform_from_parameters_affine, get_transform_from_parameters,  \
                         get_datacube_from_path_xray_generic, get_datacube_from_single_images, get_registered_images_from_array__2_transforms_bspline_by_slice, \
                         get_datacube_from_json__image_and_settings, load_json_from_path, get_fixed_image_as_array_from_json, get_datacube_from_json__image_and_settings__by_id, \
+                        get_rotation_pivot_within_roi, \
                         get_transform_from_parameters_bspline_fullFixedimage_translation, save_transform_and_image_alpha, merge_images_to_create_png, get_fixed_image_as_array_from_json_COLOR
 
 def main():
@@ -55,6 +56,13 @@ def main():
 
     data_from_json = load_json_from_path(path_json) # 230209
     data_from_json['imageFixed'] = data_from_json['workingImages'][0]
+
+    #260923 - the analysis assumes an UNROTATED fixed image (only the moving
+    #images' rotation is applied). Warn loudly if a rotation was set on the
+    #fixed image in the UI, since the UI preview will then not match the
+    #registration and the moving/fixed overlap can appear empty.
+    if float(data_from_json['imageFixed'].get('rotation', 0) or 0) != 0:
+        print('WARNING: the fixed image has rotation = ' + str(data_from_json['imageFixed']['rotation']) + ' degrees set in the UI, but the analysis assumes an UNROTATED fixed image - the registration result will not match the rotated UI preview. Set the fixed image rotation to 0 and rotate the moving image instead.')
     data_from_json['workingImages'] = data_from_json['workingImages'][1:]
 
     amount_of_datacubes = len(data_from_json['workingImages'])
@@ -113,8 +121,11 @@ def main():
 
         # 221130 # rotation (about the top-left corner of the image)
         # here can be added a key = "center_of_image" or "top_left_corner" so to have as centre of image_rotation
+        # 260923 - note: only 'top_left_corner' is implemented (set_initial_transformation raises for other values);
+        # the angle conversion now uses the exact -pi/180 (previously -1/57, which was ~0.5% off and inconsistent
+        # with get_rotated_bounding_box, which converts degrees with the exact pi/180)
         ini_rot_moving_img = {
-            'rot': datacube_from_json['rotation']*(-1/57), #230830
+            'rot': datacube_from_json['rotation']*(-np.pi/180), #260923 (was *(-1/57) #230830)
             'centre_of_rot': 'top_left_corner'             #'center_of_image'
             }
 
@@ -282,8 +293,16 @@ def main():
         loc_at_crop_01 = config['ini_loc_within_fixed_ROI']
         print('d01_loc_at_crop = ' + str(config['ini_loc_within_fixed_ROI']))
 
+        #260923 - ROI origin and rotation pivot, needed to express the transforms
+        #in full fixed-image coordinates (see
+        #get_transform_from_parameters_bspline_fullFixedimage_translation)
+        fixed_crop_origin = (config['fixed_crop_pos_x_margin'][0], config['fixed_crop_pos_y_margin'][0])
+        rotation_pivot = get_rotation_pivot_within_roi(config)
+        print('d01_fixed_crop_origin = ' + str(fixed_crop_origin))
+        print('d01_rotation_pivot = ' + str(rotation_pivot))
+
         best_tr_all = [[best_tr_s4_d01, best_tr_s3_d01, fixed_parameters_d01, loc_at_crop_01]]
-        transforms = list(get_transform_from_parameters_bspline_fullFixedimage_translation(*tr) for tr in best_tr_all)
+        transforms = list(get_transform_from_parameters_bspline_fullFixedimage_translation(tr[0], tr[1], tr[2], tr[3], fixed_crop_origin, rotation_pivot) for tr in best_tr_all)
 
         print(transforms)
 
@@ -314,7 +333,9 @@ def main():
             f.write("\n" + str(config['datacube_no']) + ' best transformation obtained at search 2 = ' + str(best_tr_s2))
             f.write("\n")
             f.write("\n" + str(config['datacube_no']) + ' best transformation obtained at search 3 = ' + str(best_tr_s3) + ' ( = translation of moving image relative to the entire area of the fixed image, from top-left corner).')
-            f.write("\n" + str(config['datacube_no']) + ' loc_at_crop = ' + str(config['ini_loc_within_fixed_ROI']) + ' ( = translation of moving image relative to the cropped area of the fixed image, from top-left corner).')
+            f.write("\n" + str(config['datacube_no']) + ' loc_at_crop = ' + str(config['ini_loc_within_fixed_ROI']) + ' ( = s3 translation parameter, recorded around the rotation pivot; equals the s1 initial translation for rotation = 0).')
+            f.write("\n" + str(config['datacube_no']) + ' fixed crop origin (ROI origin within the full fixed image) = ' + str(fixed_crop_origin) + ' ( = placement corner - rotation bounding box displacement).')
+            f.write("\n" + str(config['datacube_no']) + ' rotation pivot (moving image top-left corner within the ROI) = ' + str(rotation_pivot) + '.')
             f.write("\n" + str(config['datacube_no']) + ' best transformation obtained at search 4 = ' + str(best_tr_s4))
 
         # 241121                                                                    #image shape = (y,x)
@@ -326,7 +347,12 @@ def main():
             'transformation_obtained_s4':  {key: value.item() for (key, value) in best_tr_s4.items()}, #241125 =>  Object of type 'float32' is not JSON serializable =>  value.item() for converting nmpy float32 to python number
 
             'fixed_parameters': config['fixed_parameters'],
-            
+
+            #260923 - geometry needed to rebuild the transforms in full fixed-image coordinates
+            'fixed_crop_pos_x_margin': config['fixed_crop_pos_x_margin'],
+            'fixed_crop_pos_y_margin': config['fixed_crop_pos_y_margin'],
+            'rotation_pivot_within_roi': rotation_pivot,
+
             'target_fixed_image_size_scaled___y_x': fixed_image_scaled_COLOR.shape,
             'target_fixed_image_name': data_from_json['imageFixed']['imageEntries'][0]['id'],
             'target_fixed_image_initial_scaling': data_from_json['imageFixed']['scaling'],

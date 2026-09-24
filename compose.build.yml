@@ -1,0 +1,28 @@
+#260923 - optional overlay: build the image from this repo and persist
+#uploads/results in named volumes. Use together with compose.yml:
+#
+#  docker compose -f compose.yml -f compose.build.yml up
+#
+#the image is rebuilt when files change (docker layer cache makes that instant
+#when nothing changed). Requires the volume-aware upload handling in
+#server/services/import.js (present in this repo) - the uploads volume lives on
+#a different filesystem than the container's tmp/ directory.
+services:
+  iris:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: iris:local                #local build tag - retag/push as mariavillafane/iris if needed
+    pull_policy: build               #rebuild on plain `up` when files change; all-cached when they did not
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    volumes:
+      - iris_uploads:/app/server/uploads
+      - iris_results:/app/results
+
+volumes:
+  iris_uploads:
+  iris_results:

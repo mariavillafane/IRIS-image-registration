@@ -10,12 +10,29 @@ import { rimraf } from "rimraf";
 
 import type { UploadedImageMetadata } from "../types.js";
 
-const upload = multer({ dest: "tmp/" });
+//260923 - put the upload temp dir inside uploads/, so that in the docker
+//deployment (compose mounts uploads/ as a volume) the temp file and its final
+//destination share a filesystem and rename() stays atomic
+const upload = multer({ dest: "uploads/tmp/" });
 export const importApi = express.Router();
 
 interface SaveSettingsBody {
   thumbnail: string;
   [key: string]: unknown;
+}
+
+//260923 - volume-aware move: rename() cannot move a file across devices
+//(docker volumes and bind mounts are separate filesystems from the container's
+//tmp/ directory - that is what caused "Error: EXDEV: cross-device link not
+//permitted" on upload), so fall back to copy + unlink for that case
+async function moveUploadedFile(from: string, to: string) {
+  try {
+    await fs.rename(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    await fs.copyFile(from, to);
+    await fs.unlink(from);
+  }
 }
 
 function stripMetadataBuffers(data: sharp.Metadata): Record<string, unknown> {
@@ -35,7 +52,7 @@ importApi.post("/api/upload/:id", upload.single("image"), async (req, res) => {
   await mkdirp(dest);
   const filePath = (dest + "/" + file.originalname).replace(/\\/g, "/");
   const filePathNoExt = filePath.replace(/\.[^/.]+$/, "");
-  await fs.rename(file.path, filePath);
+  await moveUploadedFile(file.path, filePath);
   const image = sharp(filePath);
 
   const [metadata] = await Promise.all([

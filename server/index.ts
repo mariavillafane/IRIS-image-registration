@@ -13,7 +13,7 @@ const app = express(); //express() creates a http server
 // IRIS instance (production/Docker keeps the default 4000).
 const port = Number(process.env.PORT) || 4000;
 
-mkdirp("tmp");
+mkdirp("uploads/tmp");
 loadTasks();
 
 // Increase request body size limits for large file uploads

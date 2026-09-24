@@ -33,10 +33,15 @@ RUN mkdir -p results \
 COPY .nvmrc .
 RUN nvm install && npm i -g yarn
 
+#260923 - install node dependencies before copying the source, so that changing
+#any other file (e.g. scripts_registration/) reuses the cached node_modules
+#layer and only the client build re-runs
+COPY package.json yarn.lock ./
+RUN yarn
+
 COPY . .
 
-RUN yarn && yarn build
-VOLUME /app/results 
+RUN yarn build
 
 WORKDIR /app/server
 RUN yarn && yarn build
