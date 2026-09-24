@@ -68,9 +68,24 @@ print(slices_of_moving_image_dict)
 #path_json = 'mov_img_0_transformations__test_1.json'
 data_from_json = load_json_from_path(path_json)
 
+#260923 - geometry needed to express the transforms in full fixed-image
+#coordinates. New transformation jsons record them directly; older jsons are
+#supported by deriving the ROI origin and the rotation pivot from loc_at_crop
+#(s3 translation parameter) and the initial placement (initial_position_tx_ty).
+if ('fixed_crop_pos_x_margin' in data_from_json) and ('rotation_pivot_within_roi' in data_from_json):
+    fixed_crop_origin = (data_from_json['fixed_crop_pos_x_margin'][0], data_from_json['fixed_crop_pos_y_margin'][0])
+    rotation_pivot = tuple(data_from_json['rotation_pivot_within_roi'])
+else:
+    fixed_crop_origin = (data_from_json['loc_at_crop'][0] - data_from_json['initial_position_tx_ty'][0],
+                         data_from_json['loc_at_crop'][1] - data_from_json['initial_position_tx_ty'][1])
+    rotation_pivot = (-data_from_json['initial_position_tx_ty'][0] - fixed_crop_origin[0],
+                      -data_from_json['initial_position_tx_ty'][1] - fixed_crop_origin[1])
+print('fixed_crop_origin = ' + str(fixed_crop_origin))
+print('rotation_pivot = ' + str(rotation_pivot))
+
 best_tr_all = [[data_from_json['transformation_obtained_s4'], data_from_json['transformation_obtained_s3'], data_from_json['fixed_parameters'], data_from_json['loc_at_crop']]]
 
-transforms = list(get_transform_from_parameters_bspline_fullFixedimage_translation(*tr) for tr in best_tr_all)
+transforms = list(get_transform_from_parameters_bspline_fullFixedimage_translation(tr[0], tr[1], tr[2], tr[3], fixed_crop_origin, rotation_pivot) for tr in best_tr_all)
 
 target_fixed_image_shape = data_from_json['target_fixed_image_size_scaled___y_x']
 print("target_fixed_image_shape")
