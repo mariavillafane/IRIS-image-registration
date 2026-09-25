@@ -210,13 +210,18 @@ test.describe("editor canvas", () => {
     await prepareCanvas(page); // viewer events only fire with the Selection tool
     await page.getByRole("button", { name: "compare" }).click();
 
-    await expect(await movingImage(page)).toHaveAttribute(
-      "clip-path",
-      "url(#clipPath)"
-    );
+    // the curtain clip lives on a transform-free <g> wrapping the moving image
+    // (a clip-path on the <image> itself would be rotated along with it)
     await expect(
-      page.locator('.myCanvas > svg image[data-stack-id="0"]')
-    ).not.toHaveAttribute("clip-path");
+      page.locator(
+        '.myCanvas > svg g[clip-path="url(#clipPath)"] > image[data-stack-id="1"]'
+      )
+    ).toHaveCount(2); // every entry of the moving stack
+    await expect(
+      page.locator(
+        '.myCanvas > svg g[clip-path="url(#clipPath)"] > image[data-stack-id="0"]'
+      )
+    ).toHaveCount(0); // the fixed image is never curtained
 
     const rect = page.locator(".myCanvas > svg #clipPath rect");
     const before = {
@@ -234,6 +239,80 @@ test.describe("editor canvas", () => {
       y: await rect.getAttribute("y"),
     };
     expect(after.x !== before.x || after.y !== before.y).toBe(true);
+  });
+
+  test("compare mode curtain follows the mouse regardless of moving image rotation", async ({
+    page,
+  }) => {
+    await openEditorWithImages(page);
+    await prepareCanvas(page);
+
+    // drag the moving stack a little so the rotated footprint has room, then
+    // rotate it 30 degrees (before compare mode, because canvas clicks in
+    // compare mode cycle the curtain orientation instead of selecting)
+    const from = await canvasPoint(page);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 80, from.y + 60, { steps: 12 });
+    await page.mouse.up();
+    await page.mouse.click(from.x, from.y); // select the moving stack
+
+    const moving = await movingImage(page);
+    await page.getByRole("spinbutton", { name: "rotation" }).fill("30");
+    await expect(moving).toHaveAttribute("transform", /rotate\(30,/);
+
+    // rotate(30) around the stack origin swings the image's footprint left of
+    // its unrotated box; with the curtain at canvas x=20 both probes below sit
+    // inside the rotated footprint AND over the fixed image, well inside the
+    // visible panel at the "fit to viewer" scale
+    const curtainX = 20;
+    const probeY = 34;
+
+    await page.getByRole("button", { name: "compare" }).click();
+
+    // move the mouse (canvas coords -> screen) to set the curtain position;
+    // orientation stays 0: to the right of the mouse the moving image shows
+    const toScreen = (cx: number, cy: number) =>
+      page.evaluate(
+        ([x, y]) => {
+          const g = document.querySelector<SVGGElement>(".myCanvas > svg > g")!;
+          const p = new DOMPoint(x as number, y as number).matrixTransform(
+            g.getScreenCTM()!
+          );
+          return { x: p.x, y: p.y };
+        },
+        [cx, cy]
+      );
+    const curtainScreen = await toScreen(curtainX, probeY);
+    await page.mouse.move(curtainScreen.x, curtainScreen.y);
+
+    // the curtain edge sits at the mouse: reveal rect x ~= curtainX
+    const rectX = +(
+      await page.locator(".myCanvas > svg #clipPath rect").getAttribute("x")
+    )!;
+    expect(Math.abs(rectX - curtainX)).toBeLessThanOrEqual(1.5);
+
+    // probe which image is on top at two canvas points inside the ROTATED
+    // footprint (document.elementFromPoint): right of the curtain the moving
+    // image must be revealed; left of it it must be clipped away so the fixed
+    // image shows through. Before the fix the clip rect was interpreted in
+    // the image's rotated space, so the point left of the curtain wrongly
+    // showed the moving image.
+    const topStackIdAt = (cx: number, cy: number) =>
+      page.evaluate(
+        ([x, y]) => {
+          const g = document.querySelector<SVGGElement>(".myCanvas > svg > g")!;
+          const p = new DOMPoint(x as number, y as number).matrixTransform(
+            g.getScreenCTM()!
+          );
+          const el = document.elementFromPoint(p.x, p.y);
+          return el?.getAttribute("data-stack-id");
+        },
+        [cx, cy]
+      );
+    expect(await topStackIdAt(curtainX + 4, probeY)).toBe("1"); // revealed
+    expect(await topStackIdAt(curtainX - 4, probeY)).toBe("0"); // clipped: the
+    // fixed image underneath is visible where the curtain hides the mover
   });
 
   test("toggles the visibility of a moving image", async ({ page }) => {
