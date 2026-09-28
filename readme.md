@@ -36,7 +36,7 @@ docker run -p4000:4000 -it mariavillafane/iris:latest
 docker pull mariavillafane/iris:latest
 ```
 
-These steps are all shown in this short tutorial video: [IRIS 101: Installation - Run Docker Image](https://www.youtube.com/watch?v=ha4nMlK6wcY).
+These steps are all shown in this short tutorial video: [IRIS 101: Installation - Run Docker Image](https://youtu.be/MpDuwIpdbMU).
 
 # Development
 
