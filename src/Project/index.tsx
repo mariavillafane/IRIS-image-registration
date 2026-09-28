@@ -149,9 +149,11 @@ function ProjectCard({ refresh, ...p }: ProjectCardProps) {
 function TransformationData({
   id,
   transformation,
+  refresh,
 }: {
   id: string;
   transformation: string;
+  refresh?: () => void;
 }) {
   const [data, setData] = useState<TransformationJson>({});
   const [open, setOpen] = useState(false);
@@ -190,20 +192,39 @@ function TransformationData({
       <Dropzone
         onDrop={async (files) => {
           for (const file of files) {
-            const data = await uploadImage(id, file);
-            console.log(data);
-
-            await fetch(apiUrl("/api/transform"), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                transformation,
-                image: data.url,
-              }),
-            }).catch((e) => e);
+            const uploaded = await uploadImage(id, file);
+            try {
+              const response = await fetch(apiUrl("/api/transform"), {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  transformation,
+                  image: uploaded.url,
+                }),
+              });
+              if (!response.ok) {
+                const body = (await response
+                  .json()
+                  .catch(() => null)) as { error?: string } | null;
+                window.alert(
+                  `Failed to apply the transformation to ${file.name}:\n${
+                    body?.error ?? response.statusText
+                  }`
+                );
+                return;
+              }
+            } catch (e) {
+              window.alert(
+                `Failed to apply the transformation to ${file.name}:\n${e}`
+              );
+              return;
+            }
           }
+          // 260928 - reload the results so the newly transformed images show
+          // up without having to reload the page
+          refresh?.();
         }}
       >
         {({ getRootProps, getInputProps }) => (
@@ -217,7 +238,15 @@ function TransformationData({
   );
 }
 
-function Results({ id, files }: { id: string; files: string[] }) {
+function Results({
+  id,
+  files,
+  refresh,
+}: {
+  id: string;
+  files: string[];
+  refresh?: () => void;
+}) {
   const transformed = (files ?? [])
     .filter((image) => image.endsWith("transformations.json"))
     .map((t) => {
@@ -234,7 +263,11 @@ function Results({ id, files }: { id: string; files: string[] }) {
     <>
       {transformed.map((t) => (
         <Box key={t.transformation}>
-          <TransformationData id={id} transformation={t.transformation} />
+          <TransformationData
+            id={id}
+            transformation={t.transformation}
+            refresh={refresh}
+          />
           <Box display="flex" flexWrap="wrap" gap={2}>
             {t.images
               .filter((image) => !image.includes("fixed_image"))
@@ -275,7 +308,7 @@ function Results({ id, files }: { id: string; files: string[] }) {
 export function JobResults(job: Task) {
   const [results, setResults] = useState<string[]>([]);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     fetch(apiUrl(`/api/results/${job.id}`), {
       method: "GET", // *GET, POST, PUT, DELETE, etc.
       mode: "cors", // no-cors, *cors, same-origin
@@ -284,9 +317,13 @@ export function JobResults(job: Task) {
       .then(setResults);
   }, [job.id]);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
     <Box>
-      <Results id={job.id} files={results} />
+      <Results id={job.id} files={results} refresh={refresh} />
     </Box>
   );
 }

@@ -58,6 +58,16 @@ jobs:
           docker run --rm iris:ci bash --login -c \
             "cd /app && python scripts_registration/verify_rotated_bounding_box_integration.py"
 
+      - name: Run Python tests (apply-transform image loading)
+        run: |
+          docker run --rm iris:ci bash --login -c \
+            "cd /app && python scripts_registration/test_apply_transform_image_loading.py"
+
+      - name: Run Python tests (apply transformation to more images e2e)
+        run: |
+          docker run --rm iris:ci bash --login -c \
+            "cd /app && python scripts_registration/verify_apply_transform_to_more_images.py"
+
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
