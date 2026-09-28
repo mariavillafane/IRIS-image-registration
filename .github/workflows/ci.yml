@@ -14,6 +14,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      #260928 - the runner's docker storage is small and this image is large,
+      #so "no space left on device" was the most common failure. Free the
+      #preinstalled SDKs/images before the build; with the slimmed image the
+      #build now fits comfortably.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/lib/android \
+            /usr/local/share/boost /usr/share/swift /usr/share/php || true
+          sudo docker image prune -af
+          sudo docker builder prune -af
+          df -h
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -26,6 +39,11 @@ jobs:
           tags: iris:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Image size and disk usage
+        run: |
+          docker images iris:ci
+          df -h
 
       # The image contains the pinned registration env (python 3.6,
       # SimpleITK 1.2.4, opencv 3.4.2) - run the registration scripts' tests
