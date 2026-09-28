@@ -1550,10 +1550,16 @@ def get_image_as_array_from_path_v0(path):
 
 #250114 - to solve the problem of applying identified best transformation to images other than those in moving image (and of format other than JPG, i.e. to apply to TIFF images)
 def get_image_as_array_from_path(path):
-    #image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY), dtype=float) #muted 251014
-    image_as_array = np.asarray(cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY), dtype=float) #251014
-    #cv2.imwrite(str(path) + 'rawdata_opencv2_fromArray' + '.tiff', image_as_array)
-    return image_as_array
+    #260928 - cv2.cvtColor(cv2.imread(path, -1), cv2.COLOR_BGR2GRAY) raised
+    #'VScn::contains(scn) ... in function CvtHelper' on single-channel inputs
+    #(grayscale PNGs and 16-bit grayscale TIFFs - the most common images here),
+    #so 'Apply transformation to more images' silently failed for them. Load
+    #with PIL and stretch to 8-bit greyscale exactly like the moving images are
+    #loaded for the registration itself
+    # (get_moving_images_from_json_dict__imagestack__by_id => toGRAY_as_8bit_even_if_original_image_is_16bit),
+    #so additional images are rendered consistently with the registered ones.
+    image_as_array = toGRAY_as_8bit_even_if_original_image_is_16bit(Image.open(path))
+    return np.asarray(image_as_array, dtype=float)
 
 #241202
 def create_array_for_white_image(shape):

@@ -22,7 +22,7 @@ import QueueIcon from "@mui/icons-material/Queue";
 import CollectionsIcon from "@mui/icons-material/Collections";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
 import { uploadImage } from "../utils/actions";
 import { apiUrl } from "../utils/api";
@@ -32,9 +32,11 @@ import type { Task, TransformationJson } from "../types";
 function TransformationData({
   id,
   transformation,
+  refresh,
 }: {
   id: string;
   transformation: string;
+  refresh?: () => void;
 }) {
   const [data, setData] = useState<TransformationJson>({});
   useEffect(() => {
@@ -61,20 +63,39 @@ function TransformationData({
       <Dropzone
         onDrop={async (files) => {
           for (const file of files) {
-            const data = await uploadImage(id, file);
-            console.log(data);
-
-            await fetch(apiUrl("/api/transform"), {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                transformation,
-                image: data.url,
-              }),
-            }).catch((e) => e);
+            const uploaded = await uploadImage(id, file);
+            try {
+              const response = await fetch(apiUrl("/api/transform"), {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  transformation,
+                  image: uploaded.url,
+                }),
+              });
+              if (!response.ok) {
+                const body = (await response
+                  .json()
+                  .catch(() => null)) as { error?: string } | null;
+                window.alert(
+                  `Failed to apply the transformation to ${file.name}:\n${
+                    body?.error ?? response.statusText
+                  }`
+                );
+                return;
+              }
+            } catch (e) {
+              window.alert(
+                `Failed to apply the transformation to ${file.name}:\n${e}`
+              );
+              return;
+            }
           }
+          // 260928 - reload the results so the newly transformed images show
+          // up without having to close/reopen the results drawer
+          refresh?.();
         }}
       >
         {({ getRootProps, getInputProps }) => (
@@ -88,7 +109,15 @@ function TransformationData({
   );
 }
 
-function Results({ id, files }: { id: string; files: string[] | null }) {
+function Results({
+  id,
+  files,
+  refresh,
+}: {
+  id: string;
+  files: string[] | null;
+  refresh?: () => void;
+}) {
   const transformed = (files ?? [])
     .filter((image) => image.endsWith("transformations.json"))
     .map((t) => {
@@ -105,7 +134,11 @@ function Results({ id, files }: { id: string; files: string[] | null }) {
     <>
       {transformed.map((t) => (
         <Box key={t.transformation}>
-          <TransformationData id={id} transformation={t.transformation} />
+          <TransformationData
+            id={id}
+            transformation={t.transformation}
+            refresh={refresh}
+          />
           <h2>Transformed Images</h2>
           {t.images.map((image) => (
             <Fragment key={image}>
@@ -139,22 +172,45 @@ function Results({ id, files }: { id: string; files: string[] | null }) {
 
 export function JobQueueViewer({ id }: { id: string }) {
   const [results, setResults] = useState<string[] | null>(null);
+  //260928 - the results shown in the drawer belong to the JOB that was last
+  //clicked (their files live under uploads/<jobId>/results), so refreshing
+  //them after "Apply Transformation to More Images" must re-fetch that job's
+  //results - not the project's (the drawer's `id` prop)
+  const [resultsJobId, setResultsJobId] = useState<string | null>(null);
   const jobQueue = useJobQueue();
   const [showDrawer, setShowDrawer] = useState(0);
 
-  const fetchResults = async ({ id, status }: Task) => {
-    if (status !== "success") return;
-    console.log("feching", id, status);
+  const fetchResults = useCallback(
+    async ({ id, status }: Task) => {
+      if (status !== "success") return;
+      console.log("feching", id, status);
+      const resultingTransformedImageFiles: string[] = await fetch(
+        apiUrl(`/api/results/${id}`),
+        {
+          method: "GET", // *GET, POST, PUT, DELETE, etc.
+          mode: "cors", // no-cors, *cors, same-origin
+        }
+      ).then((x) => x.json());
+      setResults(resultingTransformedImageFiles);
+      setResultsJobId(id);
+      setShowDrawer(3);
+    },
+    []
+  );
+
+  //260928 - reload the results of the job whose results are shown, without
+  //changing the drawer state (used after "Apply Transformation to More Images")
+  const refreshResults = useCallback(async () => {
+    if (!resultsJobId) return;
     const resultingTransformedImageFiles: string[] = await fetch(
-      apiUrl(`/api/results/${id}`),
+      apiUrl(`/api/results/${resultsJobId}`),
       {
         method: "GET", // *GET, POST, PUT, DELETE, etc.
         mode: "cors", // no-cors, *cors, same-origin
       }
     ).then((x) => x.json());
     setResults(resultingTransformedImageFiles);
-    setShowDrawer(3);
-  };
+  }, [resultsJobId]);
 
   return (
     <>
@@ -189,7 +245,7 @@ export function JobQueueViewer({ id }: { id: string }) {
               </Typography>
             </Box>
             <Divider />
-            {<Results id={id} files={results} />}
+            {<Results id={id} files={results} refresh={refreshResults} />}
           </Stack>
         )}
         {showDrawer < 3 && (
